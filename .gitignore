@@ -1,0 +1,51 @@
+# OS generated files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Frontend (Next.js)
+frontend/node_modules/
+frontend/.next/
+frontend/out/
+frontend/build/
+frontend/.pnp.*
+frontend/.pnp.js
+frontend/coverage/
+
+# Backend (Python)
+backend/__pycache__/
+backend/venv/
+backend/.env
+backend/.venv/
+backend/env/
+backend/*.pyc
+backend/*.pyo
+backend/*.pyd
+backend/.Python
+backend/pip-log.txt
+backend/pip-delete-this-directory.txt
+backend/.tox/
+backend/.coverage
+backend/.coverage.*
+backend/.cache
+backend/nosetests.xml
+backend/coverage.xml
+backend/*.cover
+backend/*.log
+backend/.pytest_cache/
+
+# Datasets / Large files
+# It's usually best practice not to commit large CSVs to git
+*.csv
+*.parquet
+backend/2022_Hourly_Data.csv
+
+# IDEs and Editors
+.idea/
+.vscode/
+*.swp
+*.swo
