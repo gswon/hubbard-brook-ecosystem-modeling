@@ -39,10 +39,9 @@ backend/*.log
 backend/.pytest_cache/
 
 # Datasets / Large files
-# It's usually best practice not to commit large CSVs to git
-*.csv
-*.parquet
-backend/2022_Hourly_Data.csv
+# *.csv
+# *.parquet
+# backend/2022_Hourly_Data.csv
 
 # IDEs and Editors
 .idea/
