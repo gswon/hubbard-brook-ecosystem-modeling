@@ -24,3 +24,60 @@ body {
   color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
 }
+
+/* Weather Visualizer Components */
+.wv-container { @apply relative flex min-h-screen w-full flex-col bg-zinc-900 text-white font-sans overflow-hidden; }
+.wv-overlay { @apply absolute inset-0 z-50 flex items-center justify-center backdrop-blur-sm; }
+.wv-loader-overlay { @apply absolute inset-0 z-50 flex items-center justify-center backdrop-blur-sm bg-black/50; }
+.wv-error-overlay { @apply absolute inset-0 z-50 flex items-center justify-center backdrop-blur-sm bg-red-900/50 p-4 text-center; }
+
+.wv-story-panel { @apply absolute top-8 left-8 z-50 w-64 flex flex-col gap-4 font-sans; }
+.wv-story-card { @apply backdrop-blur-xl p-4 rounded-2xl shadow-2xl border border-white/10 transition-all; }
+.wv-story-card.severe { @apply bg-red-950/70 border-red-500/40; }
+.wv-story-card.moderate { @apply bg-orange-950/70 border-orange-500/40; }
+.wv-story-card.chill { @apply bg-blue-950/70 border-blue-500/40; }
+
+.wv-story-title { @apply text-xs font-bold uppercase tracking-widest mb-3 flex items-center gap-2; }
+.wv-story-item { @apply flex justify-between text-sm items-center; }
+.wv-story-value { @apply font-mono px-2 py-0.5 rounded-md text-xs font-bold; }
+.wv-story-list { @apply flex flex-col gap-2 text-white/90; }
+.wv-story-name { @apply capitalize text-white/80 font-medium tracking-wide; }
+
+.wv-controls-area { @apply absolute bottom-0 z-50 w-full p-8 pb-10 pointer-events-none; }
+.wv-controls-panel { @apply mx-auto max-w-3xl rounded-3xl bg-zinc-950/80 p-8 pb-6 backdrop-blur-2xl shadow-[0_20px_50px_rgba(0,0,0,0.5)] border border-white/10 pointer-events-auto; }
+.wv-controls-header { @apply flex items-center justify-between mb-4; }
+.wv-controls-title { @apply text-3xl font-extralight tracking-[0.2em] text-white/90; }
+
+.wv-date-picker-wrap { @apply flex items-center justify-end gap-3 mt-1; }
+.wv-date-picker-input { @apply bg-white/5 border border-white/10 hover:bg-white/10 transition-colors rounded-lg py-1.5 items-center flex pl-9 pr-2 w-36 text-sm outline-none text-white/90 font-medium; }
+.wv-date-icon { @apply absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-white/40 pointer-events-none; }
+.wv-date-text { @apply text-xl font-mono font-bold tracking-tight text-white/90; }
+
+.wv-playback-container { @apply flex flex-col gap-3; }
+.wv-playback-labels { @apply flex justify-between text-xs font-mono text-white/40 items-center uppercase tracking-wider; }
+.wv-playback-btn { @apply flex items-center gap-1.5 bg-white/10 hover:bg-white/20 active:bg-white/30 px-4 py-1.5 rounded-full transition-all text-white/90; }
+.wv-icon-small { @apply h-4 w-4; }
+.wv-btn-text { @apply font-sans font-medium; }
+.wv-slider { @apply w-full cursor-pointer accent-white; }
+
+.wv-quick-metrics { @apply grid grid-cols-4 gap-4 pt-4 border-t border-white/10 text-center text-sm font-mono; }
+.wv-metric-label { @apply block text-white/50; }
+.wv-metric-value { @apply font-bold; }
+.wv-loader-icon { @apply h-10 w-10 animate-spin text-white; }
+.wv-error-title { @apply text-xl font-bold mb-2; }
+
+/* Weather Effects Components */
+.we-container { @apply pointer-events-none absolute inset-0 z-0 overflow-hidden; }
+.we-layer { @apply absolute inset-0; }
+.we-fog { @apply absolute inset-0 bg-white; }
+.we-celestial { @apply absolute right-10 top-10 h-16 w-16 rounded-full; }
+.we-particle { @apply absolute rounded-full; }
+.we-snow { @apply w-[4px] h-[4px] bg-white opacity-80; }
+.we-rain { @apply w-[2px] bg-blue-400/60; }
+
+/* Tree Visualizer Components */
+.tv-container { @apply relative flex h-full w-full items-end justify-center overflow-hidden; }
+.tv-soil-base { @apply absolute bottom-0 h-1/4 w-full rounded-t-[100%] blur-sm; }
+.tv-svg { @apply relative z-10 mx-auto h-[60vh] max-h-[600px] w-full max-w-[400px]; }
+
+.main-layout { @apply min-h-screen bg-black; }

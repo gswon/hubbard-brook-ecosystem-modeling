@@ -1,76 +1,156 @@
 "use client";
 
 import { motion } from "framer-motion";
+import { useEffect, useState, useMemo } from "react";
 
 interface TreeVisualizerProps {
     airtemp: number; // oC
     windspeed: number; // m/s
     stream: number; // mm
+    snowDepth: number; // mm
+    date: string;
 }
 
 export default function TreeVisualizer({
     airtemp,
     windspeed,
     stream,
+    snowDepth,
+    date,
 }: TreeVisualizerProps) {
-    // 1. Temperature to Leaf Color
-    // Cold (< 0): White/Light Blue
-    // Mild (0 - 15): Light Green
-    // Warm (15 - 25): Vibrant Green
-    // Hot (> 25): Orange/Brown
+    const dateStr = date || "1/1/2022";
+    const month = parseInt(dateStr.split("/")[0]) || 1;
+    const isWinter = month === 12 || month <= 2;
+    const isAutumn = month === 10 || month === 11;
+    const isSpring = month >= 3 && month <= 5;
+
     const getLeafColor = (temp: number) => {
-        if (temp < 0) return "#e0f2fe"; // sky-100
-        if (temp < 10) return "#bbf7d0"; // green-200
-        if (temp < 20) return "#4ade80"; // green-400
-        if (temp < 25) return "#22c55e"; // green-500
-        if (temp < 30) return "#facc15"; // yellow-400
-        return "#ea580c"; // orange-600
+        if (isWinter) return "transparent"; 
+        if (isAutumn) return "#c2410c"; // Rust orange
+        if (isSpring) return "#bbf7d0"; // Blossom light green
+        if (temp < 10) return "#4ade80"; 
+        return "#15803d"; // Darker realistic green
     };
 
-    // 2. Stream to Soil/Root Color
-    // Dry (< 0.05): Light Tan
-    // Wet (> 0.2): Dark Brown
     const getSoilColor = (moisture: number) => {
-        if (moisture < 0.05) return "#d6d3d1"; // stone-300
-        if (moisture < 0.1) return "#a8a29e"; // stone-400
-        if (moisture < 0.2) return "#78716c"; // stone-500
-        return "#44403c"; // stone-700
+        if (snowDepth > 10) return "#f8fafc"; // Snow hill
+        if (moisture < 0.05) return "#d6d3d1"; // Dry dirt
+        if (moisture < 0.1) return "#78716c"; // Brownish
+        return "#292524"; // Wet dark brown
     };
 
-    // 3. Windspeed to Sway Amount
-    const swayAmount = Math.min(windspeed * 3, 25); // Max 25 degrees sway
-    const swayDuration = Math.max(0.5, 3 - windspeed * 0.5); // Faster wind = shorter duration
+    const swayAmount = Math.min(windspeed * 1.5, 12); 
+    const swayDuration = Math.max(1, 4 - windspeed * 0.5);
+
+    // Procedural Fractal Tree Generation
+    const { branches, treeLeaves } = useMemo(() => {
+        const b: any[] = [];
+        const l: any[] = [];
+        
+        function grow(x1: number, y1: number, len: number, angle: number, depth: number, maxDepth: number) {
+            if (depth === 0) return;
+            
+            // Random bend for organic look
+            const bend = (Math.random() - 0.5) * 0.15;
+            const currentAngle = angle + bend;
+            
+            const x2 = x1 + len * Math.sin(currentAngle);
+            const y2 = y1 - len * Math.cos(currentAngle);
+            
+            // Tapering thickness
+            const thickness = Math.pow(depth / maxDepth, 1.5) * 16; 
+            
+            b.push({ x1, y1, x2, y2, thickness, depth });
+            
+            // Add leaves heavily clustered at the outer branches
+            if (depth <= 2) {
+                for (let i = 0; i < 6; i++) {
+                    l.push({
+                        cx: x2 + (Math.random() * 30 - 15),
+                        cy: y2 + (Math.random() * 30 - 15),
+                        r: 6 + Math.random() * 12,
+                        opacity: 0.7 + Math.random() * 0.3
+                    });
+                }
+            }
+            
+            // Sub-branches
+            grow(x2, y2, len * (0.7 + Math.random()*0.1), currentAngle - 0.4 + Math.random() * 0.15, depth - 1, maxDepth);
+            grow(x2, y2, len * (0.7 + Math.random()*0.1), currentAngle + 0.4 + Math.random() * 0.15, depth - 1, maxDepth);
+            
+            // Occasional center branch
+            if (depth > 2 && Math.random() > 0.3) {
+                 grow(x2, y2, len * 0.55, currentAngle + (Math.random() * 0.2 - 0.1), depth - 1, maxDepth);
+            }
+        }
+        
+        // Start trunk
+        grow(100, 275, 45, 0, 7, 7); 
+        return { branches: b, treeLeaves: l };
+    }, []);
+
+    // Falling Leaves logic
+    const [fallingLeaves, setFallingLeaves] = useState<{ id: number; x: number; y: number; delay: number }[]>([]);
+    
+    useEffect(() => {
+        if (!isWinter && (isAutumn || windspeed > 4)) {
+            const leafCount = Math.floor(windspeed * 2) + (isAutumn ? 8 : 0);
+            setFallingLeaves(Array.from({ length: leafCount }).map((_, i) => ({
+                id: i,
+                x: 30 + Math.random() * 40, // 30% to 70%
+                y: 20 + Math.random() * 30, // 20vh to 50vh
+                delay: Math.random() * 4,
+            })));
+        } else {
+            setFallingLeaves([]);
+        }
+    }, [windspeed, isAutumn, isWinter]);
 
     return (
-        <div className="relative flex h-full w-full items-end justify-center overflow-hidden">
-            {/* Soil/Ground base */}
-            <motion.div
-                animate={{ backgroundColor: getSoilColor(stream) }}
-                transition={{ duration: 1 }}
-                className="absolute bottom-0 h-1/4 w-full rounded-t-[100%] blur-sm"
-            />
+        <div className="tv-container pointer-events-none absolute inset-0 pb-[10vh]">
+            {/* Falling Leaves Layer */}
+            {fallingLeaves.map(leaf => (
+                <motion.div
+                    key={leaf.id}
+                    className="absolute w-3 h-3 rounded-tl-full rounded-br-full"
+                    style={{ backgroundColor: getLeafColor(airtemp), opacity: 0.8 }}
+                    initial={{ left: `${leaf.x}vw`, top: `${leaf.y}vh` }}
+                    animate={{ 
+                        top: "120vh", 
+                        left: [`${leaf.x}vw`, `${leaf.x + windspeed * 5}vw`],
+                        rotate: [0, 360, 720]
+                    }}
+                    transition={{
+                        duration: 3 + Math.random() * 2,
+                        repeat: Infinity,
+                        delay: leaf.delay,
+                        ease: "easeIn"
+                    }}
+                />
+            ))}
 
             <svg
                 viewBox="0 0 200 300"
-                className="relative z-10 mx-auto h-[60vh] max-h-[600px] w-full max-w-[400px]"
+                className="tv-svg absolute inset-0 w-full h-full max-w-none max-h-none"
                 preserveAspectRatio="xMidYMax meet"
             >
-                {/* Roots */}
-                <motion.path
-                    d="M90 280 Q80 295 70 300 M110 280 Q120 295 130 300 M100 280 L100 300"
-                    stroke={getSoilColor(stream)}
-                    strokeWidth="6"
-                    strokeLinecap="round"
-                    fill="transparent"
-                    animate={{ stroke: getSoilColor(stream) }}
-                    transition={{ duration: 1 }}
+                {/* Rolling Hill Background */}
+                <motion.path 
+                    d="M-50,300 Q100,240 250,300 Z" 
+                    fill={getSoilColor(stream)} 
+                    animate={{ fill: getSoilColor(stream) }}
+                    transition={{ duration: 1.5 }}
                 />
 
-                {/* Tree Trunk & Branches */}
+                {/* Tree Shadow */}
+                <ellipse cx="100" cy="275" rx="35" ry="6" fill="#000" opacity="0.25" />
+
+                {/* Detailed Fractal Tree */}
                 <motion.g
-                    style={{ originX: "100px", originY: "300px" }}
+                    style={{ originX: "100px", originY: "275px" }}
                     animate={{
-                        rotate: [0, swayAmount, 0, -swayAmount, 0],
+                        rotate: [0, swayAmount, 0, -swayAmount * 0.8, 0],
+                        skewX: [0, swayAmount * 0.1, 0, -swayAmount * 0.05, 0] 
                     }}
                     transition={{
                         repeat: Infinity,
@@ -78,42 +158,59 @@ export default function TreeVisualizer({
                         ease: "easeInOut",
                     }}
                 >
-                    {/* Main Trunk */}
-                    <path
-                        d="M95 280 C95 200 90 120 100 80 C110 120 105 200 105 280 Z"
-                        fill="#5c4033"
-                    />
-                    {/* Left Branch */}
-                    <path
-                        d="M95 180 Q60 140 40 120"
-                        stroke="#5c4033"
-                        strokeWidth="12"
-                        strokeLinecap="round"
-                        fill="transparent"
-                    />
-                    {/* Right Branch */}
-                    <path
-                        d="M105 160 Q130 110 160 90"
-                        stroke="#5c4033"
-                        strokeWidth="10"
-                        strokeLinecap="round"
-                        fill="transparent"
-                    />
+                    {/* Bark / Branches */}
+                    {branches.map((b, i) => (
+                        <line 
+                            key={`bark-${i}`}
+                            x1={b.x1} y1={b.y1} x2={b.x2} y2={b.y2} 
+                            stroke="#2a1b0e" // Very deep, rich brown
+                            strokeWidth={b.thickness}
+                            strokeLinecap="round"
+                        />
+                    ))}
 
-                    {/* Leaves (Grouped to move with trunk) */}
-                    <motion.g
-                        animate={{ fill: getLeafColor(airtemp) }}
-                        transition={{ duration: 1.5 }}
-                    >
-                        {/* Main Canopy */}
-                        <circle cx="100" cy="80" r="45" opacity="0.9" />
-                        {/* Left Canopy */}
-                        <circle cx="50" cy="110" r="35" opacity="0.85" />
-                        {/* Right Canopy */}
-                        <circle cx="150" cy="85" r="30" opacity="0.85" />
-                        {/* Top Canopy */}
-                        <circle cx="100" cy="40" r="30" opacity="0.8" />
-                    </motion.g>
+                    {/* Snow collected on upper branches in winter */}
+                    {isWinter && snowDepth > 10 && branches.map((b, i) => {
+                        if (b.depth >= 3 && b.depth <= 6) { 
+                            return (
+                                <line 
+                                    key={`snow-${i}`}
+                                    x1={b.x1 - 1} y1={b.y1 - 1} x2={b.x2 - 1} y2={b.y2 - 2} 
+                                    stroke="#ffffff"
+                                    strokeWidth={b.thickness * 0.5}
+                                    strokeLinecap="round"
+                                    opacity="0.9"
+                                />
+                            );
+                        }
+                        return null;
+                    })}
+
+                    {/* Voluminous Leaves */}
+                    {!isWinter && (
+                        <motion.g
+                            animate={{ fill: getLeafColor(airtemp) }}
+                            transition={{ duration: 1.5 }}
+                            style={{ filter: "drop-shadow(0px 8px 12px rgba(0,0,0,0.35))" }}
+                        >
+                            {treeLeaves.map((leaf, i) => (
+                                <motion.circle 
+                                    key={`leaf-${i}`}
+                                    cx={leaf.cx} cy={leaf.cy} r={leaf.r}
+                                    opacity={leaf.opacity}
+                                    animate={{ 
+                                        scale: [1, 1 + Math.random() * 0.1, 1] 
+                                    }}
+                                    transition={{
+                                        repeat: Infinity,
+                                        duration: 2 + Math.random() * 3,
+                                        delay: Math.random() * 2,
+                                        ease: "easeInOut"
+                                    }}
+                                />
+                            ))}
+                        </motion.g>
+                    )}
                 </motion.g>
             </svg>
         </div>

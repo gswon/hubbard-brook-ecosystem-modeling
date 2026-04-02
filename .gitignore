@@ -48,3 +48,4 @@ backend/.pytest_cache/
 .vscode/
 *.swp
 *.swo
+nohup.out
