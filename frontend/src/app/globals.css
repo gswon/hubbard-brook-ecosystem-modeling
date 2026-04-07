@@ -189,21 +189,150 @@ body {
 .tv-soil-base  { @apply absolute bottom-0 h-1/4 w-full rounded-t-[100%] blur-sm; }
 .tv-svg        { @apply relative z-10 mx-auto h-[60vh] max-h-[600px] w-full max-w-[400px]; }
 
-/* ── Dense Grass Animation (pure CSS, zero JS overhead) ── */
+/* ══════════════════════════════════════════════
+   ✦  NATURE ANIMATIONS — Grass, Leaves, Flowers
+   ══════════════════════════════════════════════ */
+
+/* ── Dense Grass Sway — organic wind-wave effect ── */
 .grass-blade {
   animation: grass-sway var(--grass-speed, 2s) ease-in-out infinite alternate;
   will-change: transform;
+  transition: stroke 1.5s ease; /* smooth color transitions between seasons */
 }
+
+/* Staggered timing for natural wave effect */
+.grass-blade:nth-child(3n)   { animation-delay: 0.1s; animation-duration: calc(var(--grass-speed, 2s) * 1.15); }
+.grass-blade:nth-child(5n)   { animation-delay: 0.25s; animation-duration: calc(var(--grass-speed, 2s) * 0.9); }
+.grass-blade:nth-child(7n)   { animation-delay: 0.4s; }
+.grass-blade:nth-child(11n)  { animation-delay: 0.6s; animation-duration: calc(var(--grass-speed, 2s) * 1.1); }
+.grass-blade:nth-child(13n)  { animation-delay: 0.15s; animation-duration: calc(var(--grass-speed, 2s) * 0.85); }
 
 @keyframes grass-sway {
-  0%   { transform: rotate(calc(var(--grass-sway, 5deg) * -0.6)); }
-  25%  { transform: rotate(calc(var(--grass-sway, 5deg) * 0.3)); }
-  50%  { transform: rotate(calc(var(--grass-sway, 5deg) * -0.8)); }
-  75%  { transform: rotate(calc(var(--grass-sway, 5deg) * 0.5)); }
-  100% { transform: rotate(var(--grass-sway, 5deg)); }
+  0%   { transform: rotate(calc(var(--grass-sway, 5deg) * -0.6)) scaleY(1); }
+  15%  { transform: rotate(calc(var(--grass-sway, 5deg) * 0.2)) scaleY(0.98); }
+  30%  { transform: rotate(calc(var(--grass-sway, 5deg) * -0.9)) scaleY(1.02); }
+  50%  { transform: rotate(calc(var(--grass-sway, 5deg) * 0.4)) scaleY(0.97); }
+  70%  { transform: rotate(calc(var(--grass-sway, 5deg) * -0.5)) scaleY(1.01); }
+  85%  { transform: rotate(calc(var(--grass-sway, 5deg) * 0.7)) scaleY(0.99); }
+  100% { transform: rotate(var(--grass-sway, 5deg)) scaleY(1); }
 }
 
-/* ── Glass Panel Premium Touch ── */
+/* ── Falling Leaf — Realistic Flutter & Tumble ── */
+.falling-leaf {
+  pointer-events: none;
+  will-change: transform;
+  /* Leaf shape via clip-path */
+  clip-path: polygon(
+    50% 0%,
+    80% 15%,
+    100% 40%,
+    90% 70%,
+    50% 100%,
+    10% 70%,
+    0% 40%,
+    20% 15%
+  );
+}
+
+.falling-leaf--flutter {
+  animation: leaf-flutter 3s ease-in-out infinite alternate;
+}
+
+@keyframes leaf-flutter {
+  0%   { transform: rotateY(0deg) rotateZ(-15deg) scale(1); }
+  25%  { transform: rotateY(40deg) rotateZ(5deg) scale(0.95); }
+  50%  { transform: rotateY(-20deg) rotateZ(-10deg) scale(1.05); }
+  75%  { transform: rotateY(60deg) rotateZ(12deg) scale(0.9); }
+  100% { transform: rotateY(-30deg) rotateZ(-20deg) scale(1); }
+}
+
+/* ── Ground Leaf (on ground, curled) ── */
+.ground-leaf {
+  animation: ground-leaf-settle 4s ease-in-out infinite alternate;
+}
+
+@keyframes ground-leaf-settle {
+  0%, 100% { transform: rotate(var(--leaf-angle, 0deg)) scale(1); opacity: 0.85; }
+  50%      { transform: rotate(calc(var(--leaf-angle, 0deg) + 3deg)) scale(1.05); opacity: 0.9; }
+}
+
+/* ── Spring Flower Petal — Gentle bloom pulse ── */
+.ground-flower {
+  animation: flower-bloom 3.5s ease-in-out infinite;
+}
+
+@keyframes flower-bloom {
+  0%, 100% { transform: scale(1) rotate(0deg); opacity: 0.85; }
+  30%      { transform: scale(1.15) rotate(5deg); opacity: 1; }
+  60%      { transform: scale(0.95) rotate(-3deg); opacity: 0.9; }
+}
+
+/* ── Flower Petal SVG Shape ── */
+.flower-petal {
+  animation: petal-sway 2.5s ease-in-out infinite alternate;
+}
+
+@keyframes petal-sway {
+  0%   { transform: rotate(-8deg) scale(1); }
+  100% { transform: rotate(8deg) scale(1.1); }
+}
+
+/* ── Firefly Glow (summer + autumn evenings) ── */
+.firefly {
+  position: absolute;
+  border-radius: 50%;
+  pointer-events: none;
+  animation: firefly-float 6s ease-in-out infinite, firefly-glow 2s ease-in-out infinite alternate;
+}
+
+@keyframes firefly-float {
+  0%   { transform: translate(0, 0); }
+  25%  { transform: translate(15px, -25px); }
+  50%  { transform: translate(-10px, -15px); }
+  75%  { transform: translate(20px, -35px); }
+  100% { transform: translate(0, 0); }
+}
+
+@keyframes firefly-glow {
+  0%   { box-shadow: 0 0 4px 2px rgba(253, 224, 71, 0.6); opacity: 0.3; }
+  100% { box-shadow: 0 0 12px 6px rgba(253, 224, 71, 0.9); opacity: 1; }
+}
+
+/* ── Snow Sparkle — Shimmer on accumulated snow surface ── */
+.snow-sparkle {
+  animation: snow-shimmer 3s ease-in-out infinite;
+}
+
+@keyframes snow-shimmer {
+  0%, 100% { opacity: 0.2; transform: scale(0.8); }
+  50%      { opacity: 0.9; transform: scale(1.3); }
+}
+
+/* ── Mushroom / Fungus (wet ground accent) ── */
+.ground-mushroom {
+  animation: mushroom-grow 6s ease-out forwards;
+}
+
+@keyframes mushroom-grow {
+  0%   { transform: scaleY(0); transform-origin: bottom; opacity: 0; }
+  60%  { transform: scaleY(1.1); opacity: 1; }
+  100% { transform: scaleY(1); opacity: 1; }
+}
+
+/* ── Dew Drop Sparkle (morning, high humidity) ── */
+.dew-drop {
+  animation: dew-sparkle 4s ease-in-out infinite;
+}
+
+@keyframes dew-sparkle {
+  0%, 100% { opacity: 0.3; filter: brightness(1); }
+  40%      { opacity: 0.8; filter: brightness(1.5); }
+  60%      { opacity: 1;   filter: brightness(2); }
+}
+
+/* ══════════════════════════════════════════════
+   ✦  Glass Panel Premium Touch
+   ══════════════════════════════════════════════ */
 .glass-panel {
   background: rgba(15, 20, 30, 0.38);
   backdrop-filter: blur(48px) saturate(1.3);
@@ -217,3 +346,20 @@ body {
    Layout root
 ──────────────────────────────────────────── */
 .main-layout { @apply min-h-screen; background: #020617; }
+
+/* ══════════════════════════════════════════════
+   ✦  Accessibility — Respect reduced motion
+   ══════════════════════════════════════════════ */
+@media (prefers-reduced-motion: reduce) {
+  .grass-blade,
+  .falling-leaf--flutter,
+  .ground-leaf,
+  .ground-flower,
+  .flower-petal,
+  .firefly,
+  .snow-sparkle,
+  .ground-mushroom,
+  .dew-drop {
+    animation: none !important;
+  }
+}

@@ -236,6 +236,7 @@ export default function WeatherVisualizer() {
                             stream={data.stream}
                             snowDepth={data.snow}
                             date={data.date}
+                            hour={data.hour}
                         />
                     </div>
                 </>

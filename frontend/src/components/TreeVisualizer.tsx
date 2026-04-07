@@ -80,73 +80,73 @@ function getSeasonInfo(date: string, airtemp: number, stream: number): SeasonInf
     const t = Math.min(1, Math.max(0, (day - 1) / 29)); // 0→1 across the month
     const isDry = stream < 0.05;
 
-    // ── March: Winter, late March bare branches, maybe tiny buds ──
+    // ── March: Winter → Spring ────────────────────────────
     if (month === 3) {
-        const eased = t * t * t; 
+        const eased = t * t; // slow start, accelerating
         return {
-            baseSeason: "winter",
-            foliageDensity: eased * 0.1, // barely any leaves
+            baseSeason: t < 0.5 ? "winter" : "spring",
+            foliageDensity: eased * 0.6,              // reaches 60% by Mar 31
             leafColors: PALETTES.spring.leaf,
-            grassColors: lerpColorArr(PALETTES.winter.grass, PALETTES.spring.grass, t),
+            grassColors: lerpColorArr(PALETTES.winter.grass, PALETTES.spring.grass, eased),
             groundLeafColors: [],
             fallingLeafIntensity: 0,
-            blossomDensity: 0,
-            flowerDensity: 0,
-            showLeaves: t > 0.8,
+            blossomDensity: Math.max(0, (t - 0.4) * 1.6), // blossoms from ~Mar 12
+            flowerDensity: Math.max(0, (t - 0.6) * 0.5),
+            showLeaves: t > 0.15,  // first buds ~Mar 5
             isDry,
         };
     }
 
-    // ── April: Spring begins, blossoms peak mid-to-late April ──
+    // ── April: Spring ramps up ────────────────────────────
     if (month === 4) {
         return {
             baseSeason: "spring",
-            foliageDensity: 0.1 + t * 0.5, // 10% → 60%
+            foliageDensity: 0.6 + t * 0.35, // 60%→95%
             leafColors: PALETTES.spring.leaf,
             grassColors: PALETTES.spring.grass,
             groundLeafColors: [],
             fallingLeafIntensity: 0,
-            blossomDensity: t < 0.5 ? t * 2 : 1 - (t - 0.5) * 2, // Peaks at mid-April
-            flowerDensity: t * 0.5,
+            blossomDensity: 1 - t * 0.3, // blossoms fade slightly late April
+            flowerDensity: 0.3 + t * 0.5,
             showLeaves: true,
             isDry,
         };
     }
 
-    // ── May: Late spring, leaves filling out ──
+    // ── May: Late spring, full foliage ────────────────────
     if (month === 5) {
         return {
             baseSeason: "spring",
-            foliageDensity: 0.6 + t * 0.3, // 60% → 90%
-            leafColors: PALETTES.spring.leaf,
-            grassColors: PALETTES.spring.grass,
+            foliageDensity: 0.95 + t * 0.05, // 95%→100%
+            leafColors: lerpColorArr(PALETTES.spring.leaf, PALETTES.summer.leaf, t * 0.3),
+            grassColors: lerpColorArr(PALETTES.spring.grass, PALETTES.summer.grass, t * 0.3),
             groundLeafColors: [],
             fallingLeafIntensity: 0,
-            blossomDensity: 0,
-            flowerDensity: 0.5 + t * 0.3,
+            blossomDensity: Math.max(0, 0.7 - t * 0.7), // blossoms disappear
+            flowerDensity: 0.8 - t * 0.3,
             showLeaves: true,
             isDry,
         };
     }
 
-    // ── June: Spring → Summer (Peaks to full green by late June) ──
+    // ── June: Spring → Summer ────────────────────────────
     if (month === 6) {
         return {
             baseSeason: "summer",
-            foliageDensity: 0.9 + t * 0.1, // 90% → 100%
-            leafColors: lerpColorArr(PALETTES.spring.leaf, PALETTES.summer.leaf, t),
-            grassColors: lerpColorArr(PALETTES.spring.grass, PALETTES.summer.grass, t),
+            foliageDensity: 1,
+            leafColors: lerpColorArr(PALETTES.spring.leaf, PALETTES.summer.leaf, 0.3 + t * 0.7),
+            grassColors: lerpColorArr(PALETTES.spring.grass, PALETTES.summer.grass, 0.3 + t * 0.7),
             groundLeafColors: [],
             fallingLeafIntensity: 0,
             blossomDensity: 0,
-            flowerDensity: 0.8 - t * 0.3, // wild flowers fade a bit
+            flowerDensity: 0.3 + t * 0.2,
             showLeaves: true,
             isDry,
         };
     }
 
-    // ── July & August: Peak Summer! Fully green ──
-    if (month === 7 || month === 8) {
+    // ── July: Full summer ─────────────────────────────────
+    if (month === 7) {
         return {
             baseSeason: "summer",
             foliageDensity: 1,
@@ -155,53 +155,37 @@ function getSeasonInfo(date: string, airtemp: number, stream: number): SeasonInf
             groundLeafColors: [],
             fallingLeafIntensity: 0,
             blossomDensity: 0,
-            flowerDensity: 0.5,
+            flowerDensity: 0.4,
             showLeaves: true,
             isDry,
         };
     }
 
-    // ── September: Summer → Early Autumn (Colors just starting to shift late Sept) ──
-    if (month === 9) {
-        const shift = Math.max(0, (t - 0.5) * 2); // Only changes in late Sept
+    // ── August: Summer → Autumn (gradual color change!) ──
+    if (month === 8) {
         return {
-            baseSeason: "summer",
-            foliageDensity: 1,
-            leafColors: lerpColorArr(PALETTES.summer.leaf, PALETTES.autumn.leaf, shift * 0.4),
-            grassColors: lerpColorArr(PALETTES.summer.grass, PALETTES.autumn.grass, shift * 0.4),
-            groundLeafColors: [],
-            fallingLeafIntensity: shift * 0.1,
+            baseSeason: t < 0.6 ? "summer" : "autumn",
+            foliageDensity: 1 - t * 0.05,  // barely thins
+            leafColors: lerpColorArr(PALETTES.summer.leaf, PALETTES.autumn.leaf, t),
+            grassColors: lerpColorArr(PALETTES.summer.grass, PALETTES.autumn.grass, t),
+            groundLeafColors: PALETTES.autumn.groundLeaf,
+            fallingLeafIntensity: Math.max(0, (t - 0.5) * 0.4), // a few leaves late Aug
             blossomDensity: 0,
-            flowerDensity: 0.3 * (1 - t),
+            flowerDensity: Math.max(0, 0.3 - t * 0.3),
             showLeaves: true,
             isDry,
         };
     }
 
-    // ── October: Autumn peaks mid-October, then leaves start falling ──
-    if (month === 10) {
-        // Color transition completes by mid-October
-        const colorT = Math.min(1, t * 2);
-        
-        // Leaves stay 100% until mid-October, then fall to 50% by end of October
-        const density = t < 0.5 ? 1 : 1 - (t - 0.5); 
-
+    // ── September: Early autumn ───────────────────────────
+    if (month === 9) {
         return {
             baseSeason: "autumn",
-            foliageDensity: density,
-            // Start from where Sept left off (40% autumn) to 100% autumn
-            leafColors: lerpColorArr(
-                lerpColorArr(PALETTES.summer.leaf, PALETTES.autumn.leaf, 0.4), 
-                PALETTES.autumn.leaf, 
-                colorT
-            ),
-            grassColors: lerpColorArr(
-                lerpColorArr(PALETTES.summer.grass, PALETTES.autumn.grass, 0.4),
-                PALETTES.autumn.grass,
-                colorT
-            ),
+            foliageDensity: 0.95 - t * 0.05, // 95%→90%
+            leafColors: PALETTES.autumn.leaf,
+            grassColors: PALETTES.autumn.grass,
             groundLeafColors: PALETTES.autumn.groundLeaf,
-            fallingLeafIntensity: t < 0.5 ? 0.3 + t : 0.8 + (t - 0.5), // Heavy falling in late Oct
+            fallingLeafIntensity: 0.3 + t * 0.3,
             blossomDensity: 0,
             flowerDensity: 0,
             showLeaves: true,
@@ -209,19 +193,35 @@ function getSeasonInfo(date: string, airtemp: number, stream: number): SeasonInf
         };
     }
 
-    // ── November: Autumn → Winter (Leaves rapidly drop off) ──
-    if (month === 11) {
-        const decay = Math.min(1, t * 1.5); // Fully bare by ~Nov 20
+    // ── October: Peak autumn, heavy leaf fall ─────────────
+    if (month === 10) {
         return {
-            baseSeason: t < 0.4 ? "autumn" : "winter",
-            foliageDensity: 0.5 * (1 - decay), // Drops from 50% to 0%
+            baseSeason: "autumn",
+            foliageDensity: 0.9 - t * 0.2,  // 90%→70% leaves remain
             leafColors: PALETTES.autumn.leaf,
-            grassColors: lerpColorArr(PALETTES.autumn.grass, PALETTES.winter.grass, Math.min(1, t * 1.5)),
+            grassColors: lerpColorArr(PALETTES.autumn.grass, PALETTES.winter.grass, t * 0.3),
             groundLeafColors: PALETTES.autumn.groundLeaf,
-            fallingLeafIntensity: (1 - decay) * 0.5, 
+            fallingLeafIntensity: 0.6 + t * 0.4, // heavy!
             blossomDensity: 0,
             flowerDensity: 0,
-            showLeaves: decay < 1,
+            showLeaves: true,
+            isDry,
+        };
+    }
+
+    // ── November: Autumn → Winter (tree goes bare!) ───────
+    if (month === 11) {
+        const decay = t * t; // accelerating loss
+        return {
+            baseSeason: t < 0.5 ? "autumn" : "winter",
+            foliageDensity: Math.max(0, 0.7 * (1 - decay)), // 70%→~0%
+            leafColors: PALETTES.autumn.leaf,
+            grassColors: lerpColorArr(PALETTES.autumn.grass, PALETTES.winter.grass, 0.3 + t * 0.7),
+            groundLeafColors: PALETTES.autumn.groundLeaf,
+            fallingLeafIntensity: Math.max(0, 1 - decay * 0.6), // heavy early Nov, less as tree empties
+            blossomDensity: 0,
+            flowerDensity: 0,
+            showLeaves: decay < 0.9, // nearly bare by ~Nov 27
             isDry,
         };
     }
@@ -246,7 +246,7 @@ function getSeasonInfo(date: string, airtemp: number, stream: number): SeasonInf
 // ═══════════════════════════════════════════════════════════════════
 
 type Branch = { x1: number; y1: number; x2: number; y2: number; thickness: number; depth: number };
-type TreeLeaf = { cx: number; cy: number; r: number; opacity: number; isBlossom: boolean; angle: number; dropThreshold: number };
+type TreeLeaf = { cx: number; cy: number; r: number; opacity: number; isBlossom: boolean; angle: number };
 
 function buildTree(): { branches: Branch[]; leaves: TreeLeaf[] } {
     const branches: Branch[] = [];
@@ -267,10 +267,9 @@ function buildTree(): { branches: Branch[]; leaves: TreeLeaf[] } {
                     cx: tx + (Math.random() * 50 - 25),
                     cy: ty + (Math.random() * 50 - 25),
                     r: 6 + Math.random() * 12,
-                    opacity: 0.85 + Math.random() * 0.15, // more opaque
+                    opacity: 0.6 + Math.random() * 0.25,
                     isBlossom: Math.random() > 0.8,
                     angle: Math.random() * 360,
-                    dropThreshold: Math.random() // for random even shedding
                 });
             }
         }
@@ -488,8 +487,8 @@ export default function TreeVisualizer({ airtemp, windspeed, stream, snowDepth, 
         [seasonInfo.baseSeason, Math.round(seasonInfo.fallingLeafIntensity * 5), Math.round(seasonInfo.flowerDensity * 5), seasonInfo.isDry]
     );
 
-    // No more slicing which drops chunks at a time.
-    // We will conditionally render leaves based on their internal dropThreshold.
+    // How many tree leaves to render (based on foliage density)
+    const visibleLeafCount = Math.floor(leaves.length * seasonInfo.foliageDensity);
 
     const swayDeg = Math.min(windspeed * 1.8, 18);
     const swayDuration = Math.max(0.8, 4 - windspeed * 0.2);
@@ -640,20 +639,17 @@ export default function TreeVisualizer({ airtemp, windspeed, stream, snowDepth, 
                             stroke={trunkColor} strokeWidth={b.thickness} strokeLinecap="round" />
                     ))}
 
-                    {/* Foliage — density controlled by foliageDensity matching dropThreshold */}
+                    {/* Foliage — density controlled by foliageDensity */}
                     <AnimatePresence>
-                        {seasonInfo.showLeaves && seasonInfo.foliageDensity > 0 && (
+                        {seasonInfo.showLeaves && visibleLeafCount > 0 && (
                             <motion.g
                                 initial={{ opacity: 0, scale: 0.8 }}
-                                // Use solid opacity=1 so leaves aren't globally transparent during density changes
-                                animate={{ opacity: 1, scale: 1 }}
+                                animate={{ opacity: seasonInfo.foliageDensity, scale: 0.8 + seasonInfo.foliageDensity * 0.2 }}
                                 exit={{ opacity: 0, scale: 0.8 }}
                                 transition={{ duration: 2 }}
                                 style={{ filter: "drop-shadow(0 15px 25px rgba(0,0,0,0.4))" }}
                             >
-                                {leaves.map((leaf, i) => {
-                                    // Skip rendering this individual leaf if density is below its threshold
-                                    if (seasonInfo.foliageDensity < leaf.dropThreshold) return null;
+                                {leaves.slice(0, visibleLeafCount).map((leaf, i) => {
                                     const color = seasonInfo.leafColors.length > 0
                                         ? seasonInfo.leafColors[i % seasonInfo.leafColors.length]
                                         : "#15803d";
