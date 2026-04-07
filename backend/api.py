@@ -63,6 +63,7 @@ def get_weather_summary(date: str = "1/1/2022", hour: int = 0):
         # Calculate impact score (how dominant it is compared to base unit)
         if pd.isna(val):
             score = 0
+            val = None
         elif col == 'airtemp_mean_oC':
             score = abs(val) / threshold # Extreme cold or hot are both impactful
         else:
@@ -113,7 +114,12 @@ def get_weather_timeline(date: str = "1/1/2022", hour: int = 0):
         raise HTTPException(status_code=404, detail="Data not found for the given date and hour")
     
     # Return the raw row data for frontend mapping
-    return row.iloc[0].to_dict()
+    d = row.iloc[0].to_dict()
+    import math
+    for k, v in d.items():
+        if isinstance(v, float) and math.isnan(v):
+            d[k] = None
+    return d
 
 if __name__ == "__main__":
     import uvicorn
