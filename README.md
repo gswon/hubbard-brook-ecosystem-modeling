@@ -1,10 +1,13 @@
 # Hubbard Brook Ecosystem Modeling
 
-This repository contains a full-stack application for visualizing and analyzing weather & ecosystem data from Hubbard Brook. The project is split into two halves: a **FastAPI Python backend** for data processing and a **Next.js/React frontend** for the user interface.
+This repository contains a full-stack application for visualizing and analyzing weather & ecosystem data from Hubbard Brook. The project is split into two halves: 
+1. **FastAPI Python backend** for data processing
+2. **Next.js/React frontend** for the user interface.
 
 ## Getting Started
 
-To run the application locally, you will need to run the backend and frontend simultaneously. **Open two separate terminal windows** and follow the steps below.
+To run the application locally, you will need to run the backend and frontend simultaneously. 
+**Open two separate terminal windows** and follow the steps below.
 
 ### 1. Running the Backend (FastAPI)
 
@@ -53,6 +56,6 @@ The frontend UI will begin running at `http://localhost:3000`. **Keep this termi
 ### 3. Viewing the App
 
 Once both servers have successfully started, open your web browser and navigate to:
-**http://localhost:3000**
+[**http://localhost:3000**](http://localhost:3000)
 
 You can now interact with the data and use the date selector to view the ecosystem visualizations.
