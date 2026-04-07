@@ -71,9 +71,11 @@ function useRainDrops(precip: number, windspeed: number) {
 }
 
 // ─── Snow flakes ───────────────────────────────────────────────────
-function useSnowFlakes(precip: number, airtemp: number) {
+function useSnowFlakes(precip: number, airtemp: number, snowDepth: number) {
     return useMemo(() => {
-        if (!(precip > 0 && airtemp <= 0)) return [];
+        // Show snow when precipitating AND either cold enough OR snow is already on the ground
+        const shouldSnow = precip > 0 && (airtemp < 2 || snowDepth > 0);
+        if (!shouldSnow) return [];
         const count = clamp(Math.floor(precip * 200), 30, 350);
         return Array.from({ length: count }).map((_, i) => ({
             id: i,
@@ -83,7 +85,7 @@ function useSnowFlakes(precip: number, airtemp: number) {
             wander: Math.random() * 30 - 15,
             speed: 2.5 + Math.random() * 2.5,
         }));
-    }, [Math.round(precip * 30), airtemp < 0]);
+    }, [Math.round(precip * 30), airtemp < 2, snowDepth > 0]);
 }
 
 // ─── Wind streaks ──────────────────────────────────────────────────
@@ -103,8 +105,10 @@ function useWindStreaks(windspeed: number) {
 }
 
 export default function WeatherEffects({ precip, solar, rh, airtemp, snowDepth, windspeed, streamflow, hour }: WeatherEffectsProps) {
-    const isSnowing = precip > 0 && airtemp <= 0;
-    const isRaining = precip > 0 && airtemp > 0;
+    // Snow when precipitating AND (cold enough OR snow already on the ground)
+    const isSnowing = precip > 0 && (airtemp < 2 || snowDepth > 0);
+    // Rain only when precipitating AND it's warm AND no snow on the ground
+    const isRaining = precip > 0 && airtemp >= 2 && snowDepth <= 0;
     const isStormy  = precip > 2 || (precip > 0.5 && windspeed > 6);
     const isVortex  = windspeed > 12; // extreme wind – vortex
     const isCalm    = windspeed < 1 && solar > 200 && rh < 60;
@@ -112,7 +116,7 @@ export default function WeatherEffects({ precip, solar, rh, airtemp, snowDepth, 
 
     const cloudHaze  = useCloudHaze(rh, precip);
     const rainDrops  = useRainDrops(isRaining ? precip : 0, windspeed);
-    const snowFlakes = useSnowFlakes(precip, airtemp);
+    const snowFlakes = useSnowFlakes(precip, airtemp, snowDepth);
     const windStreaks = useWindStreaks(windspeed);
 
     // Celestial body
