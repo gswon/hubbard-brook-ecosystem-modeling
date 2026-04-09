@@ -46,32 +46,32 @@ interface DateRange {
 }
 
 const METRIC_DISPLAY: { key: keyof WeatherData; label: string; unit: string; decimals: number }[] = [
-    { key: "airtemp",    label: "Temp",     unit: "°C",  decimals: 1 },
-    { key: "windspeed",  label: "Wind",     unit: "m/s", decimals: 1 },
-    { key: "precip",     label: "Precip",   unit: "mm",  decimals: 2 },
-    { key: "solar",      label: "Solar",    unit: "W",   decimals: 0 },
-    { key: "rh",         label: "Humidity", unit: "%",   decimals: 0 },
-    { key: "pressure",   label: "Pressure", unit: "hPa", decimals: 1 },
-    { key: "stream",     label: "Stream",   unit: "mm",  decimals: 3 },
-    { key: "snow",       label: "Snow",     unit: "mm",  decimals: 1 },
+    { key: "airtemp", label: "Temp", unit: "°C", decimals: 1 },
+    { key: "windspeed", label: "Wind", unit: "m/s", decimals: 1 },
+    { key: "precip", label: "Precip", unit: "mm", decimals: 2 },
+    { key: "solar", label: "Solar", unit: "W", decimals: 0 },
+    { key: "rh", label: "Humidity", unit: "%", decimals: 0 },
+    { key: "pressure", label: "Pressure", unit: "hPa", decimals: 1 },
+    { key: "stream", label: "Stream", unit: "mm", decimals: 3 },
+    { key: "snow", label: "Snow", unit: "mm", decimals: 1 },
 ];
 
 export default function WeatherVisualizer() {
-    const [data,      setData]      = useState<WeatherData | null>(null);
-    const [summary,   setSummary]   = useState<WeatherSummary | null>(null);
+    const [data, setData] = useState<WeatherData | null>(null);
+    const [summary, setSummary] = useState<WeatherSummary | null>(null);
     const [dailyData, setDailyData] = useState<WeatherData[]>([]);
-    const [loading,   setLoading]   = useState(true);
-    const [error,     setError]     = useState<string | null>(null);
+    const [loading, setLoading] = useState(true);
+    const [error, setError] = useState<string | null>(null);
     const [dateRange, setDateRange] = useState<DateRange>({ start: "2024-01-01", end: "2024-12-31" });
 
     // Date/Hour controls
     const [currentDate, setCurrentDate] = useState("2024-01-05");
     const [currentHour, setCurrentHour] = useState(12);
-    const [isPlaying,   setIsPlaying]   = useState(false);
+    const [isPlaying, setIsPlaying] = useState(false);
     const playIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
     // Live mode
-    const [isLive,        setIsLive]        = useState(false);
+    const [isLive, setIsLive] = useState(false);
     const [lastLiveUpdate, setLastLiveUpdate] = useState<Date | null>(null);
     const liveIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
@@ -130,7 +130,7 @@ export default function WeatherVisualizer() {
         fetch(`${API}/date-range`)
             .then(r => r.ok ? r.json() : null)
             .then(d => { if (d) { setDateRange(d); setCurrentDate(d.start); } })
-            .catch(() => {});
+            .catch(() => { });
     }, []);
 
     useEffect(() => {
@@ -189,12 +189,12 @@ export default function WeatherVisualizer() {
     const handleLiveToggle = () => setIsLive((v) => !v);
 
     const summaryCardColor = (level: string) => {
-        if (level === "severe")   return "bg-red-950/70 border-red-500/40";
+        if (level === "severe") return "bg-red-950/70 border-red-500/40";
         if (level === "moderate") return "bg-orange-950/70 border-orange-500/40";
         return "bg-blue-950/70 border-blue-500/40";
     };
     const summaryTitleColor = (level: string) => {
-        if (level === "severe")   return "text-red-300";
+        if (level === "severe") return "text-red-300";
         if (level === "moderate") return "text-orange-300";
         return "text-blue-300";
     };
@@ -204,7 +204,7 @@ export default function WeatherVisualizer() {
         return "☀️";
     };
     const valuesBg = (level: string) => {
-        if (level === "severe")   return "bg-red-950/50";
+        if (level === "severe") return "bg-red-950/50";
         if (level === "moderate") return "bg-orange-950/50";
         return "bg-blue-950/50";
     };
@@ -227,9 +227,9 @@ export default function WeatherVisualizer() {
                         streamflow={data.streamflow || 0}
                         hour={data.hour}
                     />
-                    
-                    {/* 2) Tree visualizer layer */}
-                    <div className="absolute left-0 top-0 w-full md:w-[60%] h-full z-10 flex items-end justify-center">
+
+                    {/* 2) Tree visualizer layer - Full width for seamless ground */}
+                    <div className="absolute inset-0 z-10 flex items-end justify-start pointer-events-none">
                         <TreeVisualizer
                             airtemp={data.airtemp}
                             windspeed={data.windspeed}
@@ -242,66 +242,69 @@ export default function WeatherVisualizer() {
                 </>
             )}
 
-            {/* 3) Foreground UI layer */}
-            <div className="relative z-20 w-full h-full flex flex-col md:flex-row items-center justify-end p-6 md:p-12 pointer-events-none">
-                
-                {/* Right side container for all UI elements */}
-                <div className="w-full max-w-[40rem] flex flex-col gap-6 pointer-events-auto h-full justify-center">
+            {/* 3) Foreground UI layer - Anchored to absolute bottom-right */}
+            <div className="absolute inset-0 z-20 flex items-end justify-end p-6 md:p-10 pointer-events-none">
+
+                {/* Right side container for all UI elements - Compact and Bottom-Right aligned */}
+                <div className="w-full max-w-[32rem] flex flex-col gap-4 pointer-events-auto">
 
                     {/* Alerts Stack (Removed) */}
 
                     {/* Main glass control panel */}
-                    <div className="glass-panel w-full flex flex-col justify-between shadow-2xl relative border border-white/10 p-8 rounded-[2rem]">
+                    <div className="glass-panel w-full flex flex-col justify-between shadow-[0_32px_64px_-16px_rgba(0,0,0,0.5)] relative border border-white/10 p-6 rounded-[2rem] overflow-hidden">
+                        {/* Subtle inner glow backdrop for premium feel */}
+                        <div className="absolute -top-24 -right-24 w-48 h-48 bg-teal-500/10 blur-[80px] pointer-events-none" />
+                        <div className="absolute -bottom-24 -left-24 w-48 h-48 bg-emerald-500/10 blur-[80px] pointer-events-none" />
                         {/* Title & Live Status */}
                         <div className="flex justify-between items-start mb-8 w-full">
                             <div>
-                                <h1 className="text-4xl tracking-widest font-extralight text-slate-100 flex items-center gap-3">
+                                <h1 className="text-3xl tracking-widest font-extralight text-slate-100 flex items-center gap-3">
                                     hubbard brook <span className="font-bold tracking-normal opacity-90">viz</span>
                                 </h1>
-                                <p className="text-xs tracking-wider text-slate-400 mt-2 uppercase">Forest Ecosystem Monitor</p>
+                                <p className="text-[10px] tracking-[0.2em] text-slate-400 mt-1 uppercase">Forest Ecosystem Monitor</p>
                             </div>
                             <div className="flex flex-col items-end gap-2 text-xs">
                                 <button onClick={handleLiveToggle} className={`flex items-center gap-2 px-4 py-1.5 rounded-full border transition-all ${isLive ? "bg-emerald-500/20 border-emerald-500/50 text-emerald-300" : "bg-white/5 border-white/10 text-slate-300 hover:bg-white/10"}`}>
                                     {isLive && (
                                         <span className="relative flex h-2 w-2">
-                                          <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-                                          <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+                                            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                                            <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
                                         </span>
                                     )}
                                     <span className="font-medium tracking-wider">{isLive ? "LIVE" : "GO LIVE"}</span>
                                 </button>
                                 {isLive && lastLiveUpdate && (
-                                   <span className="text-[10px] text-white/40 uppercase font-mono tracking-wider">
-                                       Upd: {lastLiveUpdate.toLocaleTimeString()}
-                                   </span>
+                                    <span className="text-[10px] text-white/40 uppercase font-mono tracking-wider">
+                                        Upd: {lastLiveUpdate.toLocaleTimeString()}
+                                    </span>
                                 )}
                             </div>
                         </div>
 
-                        {/* Date Picker Component */}
-                        <div className="w-full flex justify-end mb-6">
+                        {/* Date Picker & Time Indicator */}
+                        <div className="w-full flex justify-between items-center mb-4 px-1">
                             {!isLive ? (
-                                <div className="flex items-center gap-4">
+                                <>
                                     <div className="relative">
-                                        <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
+                                        <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400 pointer-events-none" />
                                         <input
                                             type="date"
                                             value={currentDate}
                                             min={dateRange.start}
                                             max={dateRange.end}
                                             onChange={(e) => setCurrentDate(e.target.value || dateRange.start)}
-                                            className="w-full bg-white/5 hover:bg-white/10 transition-colors pl-10 pr-4 py-2 text-sm text-slate-200 rounded-lg border border-white/10 focus:outline-none focus:ring-1 focus:ring-teal-500/50"
+                                            className="bg-white/5 hover:bg-white/10 transition-colors pl-9 pr-3 py-1.5 text-xs text-slate-200 rounded-lg border border-white/10 focus:outline-none focus:ring-1 focus:ring-teal-500/50"
                                             style={{ colorScheme: "dark" }}
                                         />
                                     </div>
-                                    <div className="text-xl font-bold font-mono tracking-tight text-white drop-shadow-md">
+                                    <div className="text-lg font-bold font-mono tracking-tight text-white drop-shadow-md">
                                         @ {currentHour.toString().padStart(2, "0")}:00
                                     </div>
-                                </div>
+                                </>
                             ) : data ? (
-                                <div className="flex items-center gap-4 text-emerald-400 font-mono">
+                                <div className="flex w-full justify-between items-center text-emerald-400 font-mono text-sm">
                                     <span className="font-bold">{data.date}</span>
-                                    <span className="text-xl font-bold">@ {data.hour.toString().padStart(2, "0")}:00</span>
+                                    <span className="text-lg font-bold">@ {data.hour.toString().padStart(2, "0")}:00</span>
                                 </div>
                             ) : null}
                         </div>
@@ -309,13 +312,13 @@ export default function WeatherVisualizer() {
                         {/* Playback Controls & Timeline */}
                         {!isLive && (
                             <div className="flex flex-col gap-3 mb-8 w-full">
-                                <div className="flex items-center justify-between text-xs font-medium text-slate-400 font-mono">
+                                <div className="flex items-center justify-between text-[10px] font-medium text-slate-400 font-mono">
                                     <button
                                         onClick={() => setIsPlaying(!isPlaying)}
-                                        className="flex items-center gap-2 px-4 py-2 rounded-full bg-white/10 hover:bg-white/20 transition-all text-white border border-white/10 cursor-pointer"
+                                        className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-white/10 hover:bg-white/20 transition-all text-white border border-white/10 cursor-pointer"
                                         disabled={loading}
                                     >
-                                        {isPlaying ? <Pause className="w-3.5 h-3.5" /> : <Play className="w-3.5 h-3.5" />}
+                                        {isPlaying ? <Pause className="w-3 h-3" /> : <Play className="w-3 h-3" />}
                                         <span className="uppercase tracking-widest">{isPlaying ? 'Pause' : 'Play'}</span>
                                     </button>
                                     <span>0:00</span>
@@ -345,7 +348,7 @@ export default function WeatherVisualizer() {
                             )}
                             {data && METRIC_DISPLAY.map(({ key, label, unit, decimals }) => {
                                 const val = data[key] as number;
-                                
+
                                 // Prepare sparkline SVG path
                                 let sparkPath = "";
                                 let isFlat = true;
