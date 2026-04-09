@@ -36,6 +36,11 @@ function lerpColorArr(from: string[], to: string[], t: number): string[] {
     );
 }
 
+function shadeHex(hex: string, percent: number): string {
+    const [r, g, b] = hexToRgb(hex);
+    return rgbToHex(r * (1 - percent), g * (1 - percent), b * (1 - percent));
+}
+
 // ─── Season palettes ─────────────────────────────────────────────
 const PALETTES = {
     winter: {
@@ -281,7 +286,7 @@ function buildTree(): { branches: Branch[]; leaves: TreeLeaf[] } {
             grow(tx, ty, len * 0.6 * s, a + (Math.random() * 0.2 - 0.1), thickness * 0.6, depth - 1);
     }
 
-    grow(150, 300, 85, 0, 18, 7);
+    grow(200, 280, 85, 0, 18, 7);
     return { branches, leaves };
 }
 
@@ -300,60 +305,73 @@ type GroundElement = {
 function generateGroundElements(info: SeasonInfo): GroundElement[] {
     const elements: GroundElement[] = [];
 
-    const xSteps = info.baseSeason === "winter" ? 25 : 50;
-    const yRows = info.baseSeason === "winter" ? 3 : 6;
+    // Expanded massive rolling hill coverage
+    // Focus density on the visible area [0, 1000] with some buffer
+    const xSteps = info.baseSeason === "winter" ? 120 : 500;
+    const yRows = info.baseSeason === "winter" ? 6 : 18;
+
+    const vStart = -200;
+    const vEnd = 1200;
+    const vWidth = vEnd - vStart;
 
     for (let xi = 0; xi < xSteps; xi++) {
-        const x = -20 + (xi / (xSteps - 1)) * 340;
-        const t = (x + 50) / 400;
-        if (t < 0.02 || t > 0.98) continue;
-        const yTop = (1 - t) ** 2 * 400 + 2 * (1 - t) * t * 150 + t ** 2 * 400;
-        const yBottom = 398;
-        const surfaceHeight = yBottom - yTop;
-        if (surfaceHeight < 5) continue;
+        const fx = vStart + (xi / (xSteps - 1)) * vWidth;
+
+        // Align with the SVG's Q200,150 curve which peaks at y=275
+        // (Quadratic Bezier peak y = 0.25*y0 + 0.5*y_ctrl + 0.25*y2)
+        const distFromPeak = Math.abs(fx - 200);
+        const maxDist = 5200;
+        const t = distFromPeak / maxDist;
+
+        const yPeak = 275;
+        const yBase = 400;
+        const surfaceY = yPeak + (t * t) * (yBase - yPeak);
+
+        const surfaceHeight = 80;
+        if (surfaceHeight < 2) continue;
 
         for (let yi = 0; yi < yRows; yi++) {
             const rowFrac = yi / (yRows - 1);
-            const baseY = yTop + rowFrac * surfaceHeight;
-            const jx = (Math.random() - 0.5) * (340 / xSteps) * 0.8;
-            const jy = (Math.random() - 0.5) * (surfaceHeight / yRows) * 0.5;
-            const fx = x + jx;
-            const fy = baseY + jy;
-            const depthScale = 1 - rowFrac * 0.7;
+            const baseY = surfaceY + rowFrac * surfaceHeight;
+            const jx = (Math.random() - 0.5) * (vWidth / xSteps) * 2.5;
+            const jy = (Math.random() - 0.5) * (surfaceHeight / yRows);
+            const finalX = fx + jx;
+            const finalY = baseY + jy;
+            const depthScale = 1 - rowFrac * 0.5;
 
             const h = info.isDry
-                ? (2 + Math.random() * 4) * depthScale
+                ? (4 + Math.random() * 8) * depthScale
                 : info.baseSeason === "winter"
-                    ? (1.5 + Math.random() * 3) * depthScale
-                    : (5 + Math.random() * 14) * depthScale;
+                    ? (3 + Math.random() * 5) * depthScale
+                    : (12 + Math.random() * 22) * depthScale; // Much taller, lush grass
 
             let type: "grass" | "leaf" | "flower" = "grass";
             let color = info.grassColors[Math.floor(Math.random() * info.grassColors.length)];
 
             // Ground leaves — controlled by season info
-            if (info.groundLeafColors.length > 0 && info.fallingLeafIntensity > 0 && Math.random() < info.fallingLeafIntensity * 0.5) {
+            if (info.groundLeafColors.length > 0 && info.fallingLeafIntensity > 0 && Math.random() < info.fallingLeafIntensity * 0.4) {
                 type = "leaf";
                 color = info.groundLeafColors[Math.floor(Math.random() * info.groundLeafColors.length)];
             }
             // Wildflowers — controlled by flowerDensity
-            else if (info.flowerDensity > 0 && Math.random() < info.flowerDensity * 0.12) {
+            else if (info.flowerDensity > 0 && Math.random() < info.flowerDensity * 0.08) {
                 type = "flower";
                 const flowerColors = ["#f9a8d4", "#fb923c", "#fbbf24", "#c084fc", "#f472b6", "#e879f9"];
                 color = flowerColors[Math.floor(Math.random() * flowerColors.length)];
             }
 
-            const leafSize = (3 + Math.random() * 3) * depthScale;
+            const leafSize = (3 + Math.random() * 4) * depthScale;
 
             elements.push({
-                x: fx, y: fy,
+                x: finalX, y: finalY,
                 h: type === "grass" ? h : leafSize,
                 bend: type === "grass"
-                    ? (Math.random() - 0.5) * 10 * depthScale
+                    ? (Math.random() - 0.5) * 8 * depthScale // Straighter, more upright
                     : (Math.random() - 0.5) * 4 * depthScale,
                 color,
-                width: type === "grass" ? (0.8 + Math.random() * 1.2) * depthScale : leafSize,
+                width: type === "grass" ? (1.2 + Math.random() * 2.5) * depthScale : leafSize,
                 delay: Math.random() * 3,
-                opacity: type === "grass" ? 0.5 + depthScale * 0.5 : type === "flower" ? 0.9 : 0.75,
+                opacity: type === "grass" ? 0.7 + depthScale * 0.3 : type === "flower" ? 0.95 : 0.85,
                 type,
                 angle: Math.random() * 360,
                 petalCount: type === "flower" ? (4 + Math.floor(Math.random() * 3)) : undefined,
@@ -436,15 +454,17 @@ function SvgLeafShape({ cx, cy, r, fill, opacity, angle, className }: {
 }) {
     const scale = r / 12;
     return (
-        <g transform={`translate(${cx},${cy}) rotate(${angle}) scale(${scale})`} className={className}>
-            <path
-                d="M0,-12 C4,-10 8,-4 8,0 C8,6 4,12 0,12 C-4,12 -8,6 -8,0 C-8,-4 -4,-10 0,-12Z"
-                fill={fill} opacity={opacity}
-            />
-            <line x1="0" y1="-10" x2="0" y2="10" stroke="rgba(0,0,0,0.15)" strokeWidth="0.5" />
-            <line x1="0" y1="-4" x2="4" y2="-1" stroke="rgba(0,0,0,0.1)" strokeWidth="0.3" />
-            <line x1="0" y1="0" x2="-4" y2="3" stroke="rgba(0,0,0,0.1)" strokeWidth="0.3" />
-            <line x1="0" y1="4" x2="3" y2="7" stroke="rgba(0,0,0,0.1)" strokeWidth="0.3" />
+        <g transform={`translate(${cx},${cy}) rotate(${angle}) scale(${scale})`}>
+            <g className={className}>
+                <path
+                    d="M0,-12 C4,-10 8,-4 8,0 C8,6 4,12 0,12 C-4,12 -8,6 -8,0 C-8,-4 -4,-10 0,-12Z"
+                    fill={fill} opacity={opacity}
+                />
+                <line x1="0" y1="-10" x2="0" y2="10" stroke="rgba(0,0,0,0.15)" strokeWidth="0.5" />
+                <line x1="0" y1="-4" x2="4" y2="-1" stroke="rgba(0,0,0,0.1)" strokeWidth="0.3" />
+                <line x1="0" y1="0" x2="-4" y2="3" stroke="rgba(0,0,0,0.1)" strokeWidth="0.3" />
+                <line x1="0" y1="4" x2="3" y2="7" stroke="rgba(0,0,0,0.1)" strokeWidth="0.3" />
+            </g>
         </g>
     );
 }
@@ -455,14 +475,16 @@ function SvgFlowerShape({ cx, cy, size, color, petalCount, delay }: {
 }) {
     const angle = 360 / petalCount;
     return (
-        <g transform={`translate(${cx},${cy})`} className="ground-flower"
-            style={{ transformOrigin: `${cx}px ${cy}px`, animationDelay: `${delay}s` } as React.CSSProperties}>
-            {Array.from({ length: petalCount }).map((_, i) => (
-                <ellipse key={i} cx={0} cy={-size * 0.8} rx={size * 0.4} ry={size * 0.7}
-                    fill={color} opacity={0.85} transform={`rotate(${i * angle})`} />
-            ))}
-            <circle cx={0} cy={0} r={size * 0.3} fill="#fbbf24" opacity={0.95} />
-            <circle cx={0} cy={0} r={size * 0.15} fill="#f59e0b" opacity={0.8} />
+        <g transform={`translate(${cx},${cy})`}>
+            <g className="ground-flower"
+                style={{ transformOrigin: `0px 0px`, animationDelay: `${delay}s` } as React.CSSProperties}>
+                {Array.from({ length: petalCount }).map((_, i) => (
+                    <ellipse key={i} cx={0} cy={-size * 0.8} rx={size * 0.4} ry={size * 0.7}
+                        fill={color} opacity={0.85} transform={`rotate(${i * angle})`} />
+                ))}
+                <circle cx={0} cy={0} r={size * 0.3} fill="#fbbf24" opacity={0.95} />
+                <circle cx={0} cy={0} r={size * 0.15} fill="#f59e0b" opacity={0.8} />
+            </g>
         </g>
     );
 }
@@ -475,7 +497,11 @@ export default function TreeVisualizer({ airtemp, windspeed, stream, snowDepth, 
     // Continuous season info (gradual transitions!)
     const seasonInfo = useMemo(() => getSeasonInfo(date, airtemp, stream), [date, airtemp, stream < 0.05]);
 
-    const baseSoilColor = stream < 0.05 ? "#574f4a" : "#292524";
+    // Match ground directly to grass theme for dense appearance, adjusting for stream dryness
+    const rawSurface = seasonInfo.grassColors[0] || "#57534e";
+    const rawDeep = seasonInfo.grassColors[seasonInfo.grassColors.length - 1] || "#1c1917";
+    const surfaceColor = stream < 0.05 ? lerpColor(rawSurface, "#8c7b70", 0.4) : shadeHex(rawSurface, 0.1);
+    const deepColor = stream < 0.05 ? lerpColor(rawDeep, "#4a403b", 0.5) : shadeHex(rawDeep, 0.6);
 
     const { branches, leaves } = useMemo(() => buildTree(), []);
     const fallingLeaves = useFallingLeaves(windspeed, seasonInfo);
@@ -500,8 +526,7 @@ export default function TreeVisualizer({ airtemp, windspeed, stream, snowDepth, 
     const grassSwaySpeed = Math.max(0.8, 2.5 - windspeed * 0.12);
 
     return (
-        <div
-            className="tv-container pointer-events-none absolute inset-0 pb-[8vh] flex justify-center items-end"
+        <div className="tv-container pointer-events-none absolute inset-0 flex items-end"
             style={{
                 "--grass-sway": `${grassSwayDeg}deg`,
                 "--grass-speed": `${grassSwaySpeed}s`,
@@ -531,19 +556,40 @@ export default function TreeVisualizer({ airtemp, windspeed, stream, snowDepth, 
                 />
             ))}
 
-            {/* Butterflies */}
+            {/* Butterflies — SVG wing shapes */}
             {butterflies.map(b => (
                 <motion.div
-                    key={b.id} className="absolute w-3 h-3 rounded-full pointer-events-none blur-[1px]"
-                    style={{ backgroundColor: b.color }}
-                    initial={{ left: `${b.x}vw`, top: "60vh" }}
+                    key={b.id} className="absolute pointer-events-none"
+                    style={{ width: 28, height: 20 }}
+                    initial={{ left: `${b.x}vw`, top: "60vh", opacity: 0 }}
                     animate={{
-                        top: ["60vh", "30vh", "50vh", "20vh"],
-                        left: [`${b.x}vw`, `${b.x + 5}vw`, `${b.x - 5}vw`, `${b.x + 10}vw`],
-                        opacity: [0, 1, 1, 0]
+                        top: ["65vh", "35vh", "55vh", "25vh"],
+                        left: [`${b.x}vw`, `${b.x + 6}vw`, `${b.x - 4}vw`, `${b.x + 9}vw`],
+                        opacity: [0, 1, 1, 0.8, 0]
                     }}
-                    transition={{ duration: 6 + Math.random() * 4, repeat: Infinity, delay: b.delay, ease: "easeInOut" }}
-                />
+                    transition={{ duration: 7 + Math.random() * 4, repeat: Infinity, delay: b.delay, ease: "easeInOut" }}
+                >
+                    <motion.svg viewBox="0 0 28 20" width="28" height="20"
+                        animate={{ scaleX: [1, -1, 1] }}
+                        transition={{ duration: 0.25, repeat: Infinity, ease: "easeInOut" }}
+                    >
+                        {/* Left upper wing */}
+                        <path d="M14,10 C10,4 2,2 1,7 C0,12 6,14 14,10Z" fill={b.color} opacity={0.85} />
+                        {/* Left lower wing */}
+                        <path d="M14,10 C10,13 4,17 5,19 C7,21 12,16 14,10Z" fill={b.color} opacity={0.7} />
+                        {/* Right upper wing */}
+                        <path d="M14,10 C18,4 26,2 27,7 C28,12 22,14 14,10Z" fill={b.color} opacity={0.85} />
+                        {/* Right lower wing */}
+                        <path d="M14,10 C18,13 24,17 23,19 C21,21 16,16 14,10Z" fill={b.color} opacity={0.7} />
+                        {/* Body */}
+                        <ellipse cx="14" cy="10" rx="1.2" ry="5" fill="#1a0a00" opacity={0.8} />
+                        {/* Antennae */}
+                        <line x1="14" y1="5" x2="11" y2="1" stroke="#1a0a00" strokeWidth="0.5" />
+                        <line x1="14" y1="5" x2="17" y2="1" stroke="#1a0a00" strokeWidth="0.5" />
+                        <circle cx="11" cy="1" r="0.7" fill="#1a0a00" />
+                        <circle cx="17" cy="1" r="0.7" fill="#1a0a00" />
+                    </motion.svg>
+                </motion.div>
             ))}
 
             {/* Fireflies — summer/autumn evenings */}
@@ -556,14 +602,14 @@ export default function TreeVisualizer({ airtemp, windspeed, stream, snowDepth, 
             ))}
 
             {/* SVG Canvas */}
-            <svg viewBox="0 0 300 400" className="tv-svg absolute inset-x-0 bottom-0 w-[120%] max-w-[800px] h-[90%] mx-auto"
-                preserveAspectRatio="xMidYMax meet" overflow="visible">
+            <svg viewBox="0 0 1000 400" className="tv-svg absolute inset-0 w-full h-full"
+                preserveAspectRatio="xMidYMax slice" overflow="visible">
 
                 <defs>
                     <linearGradient id="groundGrad" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="0%" stopColor={stream < 0.05 ? "#78716c" : "#57534e"} />
-                        <stop offset="35%" stopColor={baseSoilColor} />
-                        <stop offset="100%" stopColor={stream < 0.05 ? "#44403c" : "#1c1917"} />
+                        <stop offset="0%" stopColor={surfaceColor} />
+                        <stop offset="40%" stopColor={lerpColor(surfaceColor, deepColor, 0.4)} />
+                        <stop offset="100%" stopColor={deepColor} />
                     </linearGradient>
                     <linearGradient id="soilHighlight" x1="0" y1="0" x2="1" y2="0">
                         <stop offset="0%" stopColor="transparent" />
@@ -577,13 +623,31 @@ export default function TreeVisualizer({ airtemp, windspeed, stream, snowDepth, 
                         <stop offset="60%" stopColor="rgba(0,0,0,0.15)" />
                         <stop offset="100%" stopColor="rgba(0,0,0,0)" />
                     </radialGradient>
+                    <linearGradient id="bottomFade" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="0%" stopColor="white" stopOpacity="1" />
+                        <stop offset="85%" stopColor="white" stopOpacity="1" />
+                        <stop offset="100%" stopColor="white" stopOpacity="0" />
+                    </linearGradient>
+                    <mask id="groundMask">
+                        <rect x="-5000" y="-1000" width="10000" height="3000" fill="url(#bottomFade)" />
+                    </mask>
                 </defs>
 
-                {/* Ground mound */}
-                <motion.path d="M-50,400 Q150,150 350,400 Z" fill="url(#groundGrad)"
-                    animate={{ opacity: 1 }} transition={{ duration: 2 }} />
-                <path d="M-50,400 Q150,155 350,400 Z" fill="url(#soilHighlight)" opacity={0.5} />
-                <path d="M-20,395 Q150,158 320,395" fill="none" stroke="rgba(255,255,255,0.08)" strokeWidth="1.5" />
+                <motion.g animate={{ opacity: 1 }} initial={{ opacity: 0 }} transition={{ duration: 2 }} mask="url(#groundMask)">
+                    {/* Primary wide rolling hill, massive width to avoid edges */}
+                    <path d="M-5000,400 Q200,150 6000,400 L6000,2000 L-5000,2000 Z" fill="url(#groundGrad)" />
+
+                    {/* Darker underbelly shadow to give the ground roundness and volume beneath the crest */}
+                    <path d="M-5000,400 Q200,195 6000,400 Z" fill="rgba(0,0,0,0.15)" style={{ mixBlendMode: 'multiply', filter: 'blur(10px)' }} />
+
+                    {/* Lighter specular soil highlight right along the top crest */}
+                    <path d="M-5000,400 Q200,153 6000,400" fill="none" stroke="url(#soilHighlight)" opacity={0.7} strokeWidth="3" style={{ filter: 'blur(1.5px)' }} />
+                    <path d="M-5000,400 Q200,156 6000,400" fill="none" stroke="rgba(255,255,255,0.12)" strokeWidth="2" style={{ filter: 'blur(1px)' }} />
+                    <path d="M-5000,395 Q200,158 6000,395" fill="none" stroke="rgba(255,255,255,0.06)" strokeWidth="1" />
+
+                    {/* Bottom gradient shadow to anchor the tree roots locally */}
+                    <path d="M-250,405 Q200,300 650,405 Z" fill="rgba(0,0,0,0.4)" style={{ filter: 'blur(12px)' }} />
+                </motion.g>
 
                 {/* Ground elements */}
                 {snowDepth < 5 && groundElements.map((g, i) => {
@@ -600,21 +664,21 @@ export default function TreeVisualizer({ airtemp, windspeed, stream, snowDepth, 
                         <path key={`g${i}`}
                             d={`M${g.x},${g.y} Q${g.x + g.bend},${g.y - g.h * 0.6} ${g.x + g.bend * 1.8},${g.y - g.h}`}
                             stroke={g.color} strokeWidth={g.width} fill="none" strokeLinecap="round"
-                            opacity={g.opacity} className="grass-blade"
-                            style={{ transformOrigin: `${g.x}px ${g.y}px`, animationDelay: `${g.delay}s` }} />
+                            opacity={g.opacity} />
                     );
                 })}
 
-                {/* Snow cap */}
+                {/* Majestic Snow cap */}
                 {snowDepth > 5 && (
                     <>
-                        <motion.path d="M-50,400 Q150,150 350,400 Z"
+                        <motion.path d="M-850,400 Q150,150 1150,400 L1150,1200 L-850,1200 Z"
                             fill="#f1f5f9" opacity={Math.min(snowDepth / 50, 1)}
                             initial={{ opacity: 0 }} animate={{ opacity: Math.min(snowDepth / 50, 1) }} />
-                        {snowDepth > 15 && Array.from({ length: 8 }).map((_, i) => {
-                            const st = 0.15 + (i / 8) * 0.7;
-                            const sx = -50 + st * 400;
-                            const sy = (1 - st) ** 2 * 400 + 2 * (1 - st) * st * 155 + st ** 2 * 400;
+                        {snowDepth > 15 && Array.from({ length: 14 }).map((_, i) => {
+                            const st = (i / 13);
+                            const sx = -300 + st * 900;
+                            const t = (sx + 850) / 2000;
+                            const sy = (1 - t) ** 2 * 400 + 2 * (1 - t) * t * 155 + t ** 2 * 400;
                             return <circle key={`sp${i}`} cx={sx} cy={sy + 5 + Math.random() * 20}
                                 r={1 + Math.random() * 1.5} fill="white" className="snow-sparkle"
                                 style={{ animationDelay: `${i * 0.4}s` }} />;
@@ -623,11 +687,11 @@ export default function TreeVisualizer({ airtemp, windspeed, stream, snowDepth, 
                 )}
 
                 {/* Tree shadow */}
-                <ellipse cx="150" cy="297" rx={55 + windspeed * 0.8} ry="10" fill="url(#shadowGrad)" />
+                <ellipse cx="200" cy="277" rx={55 + windspeed * 0.8} ry="7" fill="url(#shadowGrad)" />
 
                 {/* Tree structure */}
                 <motion.g
-                    style={{ originX: "150px", originY: "300px" }}
+                    style={{ originX: "200px", originY: "280px" }}
                     animate={{
                         rotate: [0, swayDeg, 0, -swayDeg * 0.6, 0],
                         skewX: [0, swayDeg * 0.05, 0, -swayDeg * 0.03, 0],
@@ -635,10 +699,40 @@ export default function TreeVisualizer({ airtemp, windspeed, stream, snowDepth, 
                     }}
                     transition={{ repeat: Infinity, duration: swayDuration, ease: "easeInOut" }}
                 >
-                    {branches.map((b, i) => (
-                        <line key={i} x1={b.x1} y1={b.y1} x2={b.x2} y2={b.y2}
-                            stroke={trunkColor} strokeWidth={b.thickness} strokeLinecap="round" />
-                    ))}
+                    {/* Trunk base — wide ellipse to blend into ground smoothly */}
+                    <ellipse cx="200" cy="278" rx={branches[0]?.thickness * 0.9 || 16} ry="5"
+                        fill={trunkColor} opacity={0.9} />
+
+                    {branches.map((b, i) => {
+                        // Compute a tapered branch as a filled polygon:
+                        // Two points at the base (half-width apart perpendicular to branch angle)
+                        // and two points at the tip (much thinner)
+                        const dx = b.x2 - b.x1;
+                        const dy = b.y2 - b.y1;
+                        const len = Math.sqrt(dx * dx + dy * dy) || 1;
+                        // Perpendicular unit vector
+                        const nx = -dy / len;
+                        const ny = dx / len;
+                        const baseW = b.thickness * 0.55;
+                        const tipW = b.thickness * 0.10;
+                        // Four corners of the tapered shape
+                        const x1a = b.x1 + nx * baseW, y1a = b.y1 + ny * baseW;
+                        const x1b = b.x1 - nx * baseW, y1b = b.y1 - ny * baseW;
+                        const x2a = b.x2 + nx * tipW,  y2a = b.y2 + ny * tipW;
+                        const x2b = b.x2 - nx * tipW,  y2b = b.y2 - ny * tipW;
+                        // Darken slightly for depth on finer branches
+                        const colorShift = Math.max(0, (7 - b.depth) * 8);
+                        const r = parseInt(trunkColor.slice(1,3), 16);
+                        const g = parseInt(trunkColor.slice(3,5), 16);
+                        const bC = parseInt(trunkColor.slice(5,7), 16);
+                        const branchColor = `rgb(${Math.min(255,r+colorShift)},${Math.min(255,g+colorShift)},${Math.min(255,bC+colorShift)})`;
+                        return (
+                            <path key={i}
+                                d={`M${x1a},${y1a} L${x2a},${y2a} L${x2b},${y2b} L${x1b},${y1b} Z`}
+                                fill={branchColor}
+                            />
+                        );
+                    })}
 
                     {/* Foliage — density controlled by foliageDensity matching dropThreshold */}
                     <AnimatePresence>
