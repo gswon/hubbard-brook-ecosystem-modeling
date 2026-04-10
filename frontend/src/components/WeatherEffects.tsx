@@ -55,11 +55,10 @@ function useCloudHaze(rh: number, precip: number) {
     }, [Math.round(rh / 20), precip > 0]);
 }
 
-// ─── Rain drops ────────────────────────────────────────────────────
 function useRainDrops(precip: number, windspeed: number) {
     return useMemo(() => {
         if (precip <= 0) return [];
-        const count = clamp(Math.floor(precip * 120), 20, 400);
+        const count = clamp(Math.floor(precip * 80), 10, 250); // Reduced from 120/400
         return Array.from({ length: count }).map((_, i) => ({
             id: i,
             x: -20 + Math.random() * 140,
@@ -70,13 +69,12 @@ function useRainDrops(precip: number, windspeed: number) {
     }, [Math.round(precip * 20), Math.round(windspeed)]);
 }
 
-// ─── Snow flakes ───────────────────────────────────────────────────
 function useSnowFlakes(precip: number, airtemp: number, snowDepth: number) {
     return useMemo(() => {
         // Show snow when precipitating AND either cold enough OR snow is already on the ground
         const shouldSnow = precip > 0 && (airtemp < 2 || snowDepth > 0);
         if (!shouldSnow) return [];
-        const count = clamp(Math.floor(precip * 200), 30, 350);
+        const count = clamp(Math.floor(precip * 120), 20, 200); // Reduced from 200/350
         return Array.from({ length: count }).map((_, i) => ({
             id: i,
             x: Math.random() * 110 - 5,
@@ -113,9 +111,9 @@ function useWindFlow(windspeed: number) {
             id: i,
             top: 15 + Math.random() * 70,
             delay: Math.random() * 6,
-            speed: clamp(2.5 - windspeed * 0.12, 0.6, 2.5) + Math.random() * 0.5,
-            opacity: 0.1 + (windspeed / 20) * 0.4,
-            width: 150 + Math.random() * 200,
+            speed: clamp(2.0 - windspeed * 0.1, 0.4, 2.0) + Math.random() * 0.4,
+            opacity: 0.2 + (windspeed / 20) * 0.6, // More visible
+            width: 200 + Math.random() * 250,
         }));
     }, [Math.round(windspeed)]);
 }
@@ -145,8 +143,8 @@ export default function WeatherEffects({ precip, solar, rh, airtemp, snowDepth, 
     const sunSize   = isDay ? "8rem" : "5.5rem";
     const sunColor  = isDay ? "#fef08a" : "#e2e8f0";
     const sunGlow   = isDay
-        ? `0 0 ${80 + solar / 4}px ${24 + solar / 8}px rgba(253,224,71,${clamp(solar / 300, 0, 1)})`
-        : "0 0 30px 8px rgba(200,220,255,0.3)";
+        ? `0 0 ${60 + solar / 6}px ${10 + solar / 12}px rgba(253,224,71,${clamp(solar / 400, 0, 0.8)})`
+        : "0 0 20px 4px rgba(200,220,255,0.2)";
 
     return (
         <div className="we-container overflow-hidden">
@@ -194,45 +192,26 @@ export default function WeatherEffects({ precip, solar, rh, airtemp, snowDepth, 
                 />
             ))}
 
+            {/* ── Sunlight Brightness Overlay (Refined & Smooth) ──── */}
+            {isDay && solar > 100 && (
+                <motion.div
+                    className="absolute inset-0 pointer-events-none z-10"
+                    style={{
+                        background: "linear-gradient(to bottom, white, transparent)",
+                        opacity: clamp((solar - 100) / 2000, 0, 0.2)
+                    }}
+                    animate={{ opacity: clamp((solar - 100) / 2000, 0, 0.2) }}
+                    transition={{ duration: 1.5, ease: "easeInOut" }}
+                />
+            )}
+
             {/* ── Sun / Moon ─────────────────────────────────────── */}
             <motion.div
                 className="absolute rounded-full flex items-center justify-center z-0 pointer-events-none"
                 style={{ left: `calc(${cx}vw - 4rem)`, top: `calc(${cy}vh - 4rem)` }}
                 animate={{ width: sunSize, height: sunSize, backgroundColor: sunColor, boxShadow: sunGlow }}
                 transition={{ duration: 1.5, type: "spring", bounce: 0 }}
-            >
-                {/* Sun rays – calm sunny day */}
-                {isCalm && isDay && solar > 150 && (
-                    <motion.div
-                        className="absolute inset-0 rounded-full pointer-events-none"
-                        animate={{ rotate: 360 }}
-                        transition={{ duration: 12, repeat: Infinity, ease: "linear" }}
-                    >
-                        {Array.from({ length: 8 }).map((_, i) => (
-                            <div
-                                key={i}
-                                className="absolute top-1/2 left-1/2 origin-left pointer-events-none"
-                                style={{
-                                    width: `${40 + solar / 15}px`, height: "2px",
-                                    background: "linear-gradient(to right, rgba(253,224,71,0.8), transparent)",
-                                    transform: `rotate(${i * 45}deg) translateY(-50%)`,
-                                    borderRadius: "999px",
-                                }}
-                            />
-                        ))}
-                    </motion.div>
-                )}
-
-                {/* Sun lens flare pulse */}
-                {isDay && solar > 100 && (
-                    <motion.div
-                        className="absolute inset-[-150%] rounded-full pointer-events-none"
-                        style={{ background: "radial-gradient(circle, rgba(253,224,71,0.5) 0%, transparent 70%)", filter: "blur(18px)" }}
-                        animate={{ scale: [1, 1.3, 1], opacity: [0.5, 0.9, 0.5] }}
-                        transition={{ duration: 5, repeat: Infinity, ease: "easeInOut" }}
-                    />
-                )}
-            </motion.div>
+            />
 
             {/* ── Lightning flash (heavy storm) ─────────────────────── */}
             <AnimatePresence>

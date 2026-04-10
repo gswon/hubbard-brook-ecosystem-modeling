@@ -1,7 +1,7 @@
 "use client";
 
 import { motion, AnimatePresence } from "framer-motion";
-import { useMemo, useEffect, useState } from "react";
+import React, { useMemo, useEffect, useState, memo } from "react";
 
 interface TreeVisualizerProps {
     airtemp: number;
@@ -247,47 +247,70 @@ function getSeasonInfo(date: string, airtemp: number, stream: number): SeasonInf
 }
 
 // ═══════════════════════════════════════════════════════════════════
-// ✦  PROCEDURAL FRACTAL TREE
+// ✦  PROCEDURAL FRACTAL TREE (Seeded)
 // ═══════════════════════════════════════════════════════════════════
 
 type Branch = { x1: number; y1: number; x2: number; y2: number; thickness: number; depth: number };
 type TreeLeaf = { cx: number; cy: number; r: number; opacity: number; isBlossom: boolean; angle: number; dropThreshold: number; branchDepth: number };
 
+// Seeded PRNG to ensure a consistent "Hero Tree"
+function createSeededRandom(seed: number) {
+    let state = seed;
+    return function () {
+        state = (state * 1664525 + 1013904223) % 4294967296;
+        return state / 4294967296;
+    };
+}
+
 function buildTree(): { branches: Branch[]; leaves: TreeLeaf[] } {
     const branches: Branch[] = [];
     const leaves: TreeLeaf[] = [];
 
+    // Seed 202 for a wide-reaching, majestic hero tree
+    const seededRandom = createSeededRandom(202);
+
     function grow(x: number, y: number, len: number, angle: number, thickness: number, depth: number) {
         if (depth === 0) return;
-        const bend = (Math.random() - 0.5) * 0.3;
+
+        // Very minimal bend to keep it straight and strong
+        const bend = (seededRandom() - 0.5) * 0.04;
         const a = angle + bend;
         const tx = x + len * Math.sin(a);
         const ty = y - len * Math.cos(a);
         branches.push({ x1: x, y1: y, x2: tx, y2: ty, thickness, depth });
 
         if (depth <= 3) {
-            const n = depth === 1 ? 6 : 3;
+            const n = depth === 1 ? 10 : 5; // Reduced from 12/6
             for (let i = 0; i < n; i++) {
                 leaves.push({
-                    cx: tx + (Math.random() * 50 - 25),
-                    cy: ty + (Math.random() * 50 - 25),
-                    r: 6 + Math.random() * 12,
-                    opacity: 0.85 + Math.random() * 0.15, // more opaque
-                    isBlossom: Math.random() > 0.8,
-                    angle: Math.random() * 360,
-                    dropThreshold: Math.random(), // slight random jitter within depth
+                    cx: tx + (seededRandom() * 70 - 35),
+                    cy: ty + (seededRandom() * 70 - 35),
+                    r: 9 + seededRandom() * 15,
+                    opacity: 0.85 + seededRandom() * 0.15,
+                    isBlossom: seededRandom() > 0.92,
+                    angle: seededRandom() * 360,
+                    dropThreshold: seededRandom(),
                     branchDepth: depth
                 });
             }
         }
-        const s = 0.7 + Math.random() * 0.15;
-        grow(tx, ty, len * s, a - 0.25 - Math.random() * 0.3, thickness * 0.65, depth - 1);
-        grow(tx, ty, len * s, a + 0.25 + Math.random() * 0.3, thickness * 0.65, depth - 1);
-        if (Math.random() > 0.35 && depth > 2)
-            grow(tx, ty, len * 0.6 * s, a + (Math.random() * 0.2 - 0.1), thickness * 0.6, depth - 1);
+
+        const s = depth > 4 ? 0.76 : 0.82;
+        const spread = 0.50;
+
+        // Consistent binary splitting for a full, healthy look
+        grow(tx, ty, len * s, a - spread, thickness * 0.7, depth - 1);
+        grow(tx, ty, len * s, a + spread, thickness * 0.7, depth - 1);
+
+        // Core logic: Add central leader only in the mid-canopy (depth 3-5)
+        // This keeps the very bottom (6-7) clean but makes the heart of the tree full.
+        if (depth >= 3 && depth <= 5) {
+            grow(tx, ty, len * 0.45, a + (seededRandom() * 0.1 - 0.05), thickness * 0.55, depth - 1);
+        }
     }
 
-    grow(200, 280, 85, 0, 18, 7);
+    // Majestic wide starting point: Reduced depth to 6 for better performance, increased size to compensate
+    grow(200, 280, 130, 0, 32, 6);
     return { branches, leaves };
 }
 
@@ -414,19 +437,29 @@ function useFallingLeaves(windspeed: number, info: SeasonInfo) {
     return leaves;
 }
 
-function useButterflies(info: SeasonInfo, airtemp: number) {
-    const [bugs, setBugs] = useState<{ id: number; x: number; delay: number; color: string }[]>([]);
+function useBirds(info: SeasonInfo, airtemp: number) {
+    const [birds, setBirds] = useState<{ id: number; x: number; y: number; delay: number; speed: number; scale: number }[]>([]);
     useEffect(() => {
-        if (airtemp < 10 || info.baseSeason === "winter" || info.flowerDensity <= 0) {
-            setBugs([]); return;
+        // Active in spring/summer/autumn when it's not freezing
+        if (airtemp < 8 || info.baseSeason === "winter") {
+            setBirds([]); return;
         }
-        const count = Math.min(Math.ceil(info.flowerDensity * 4), 5);
-        setBugs(Array.from({ length: count }).map((_, i) => ({
-            id: i, x: 20 + Math.random() * 60, delay: Math.random() * 3,
-            color: ["#fef08a", "#bae6fd", "#fbcfe8"][Math.floor(Math.random() * 3)]
-        })));
-    }, [info.baseSeason, Math.round(airtemp / 10), Math.round(info.flowerDensity * 10)]);
-    return bugs;
+        // Triangle Formation (V-shape) of 3 birds
+        const count = 3;
+        const leaderY = 10 + Math.random() * 30;
+        const baseDelay = 2 + Math.random() * 5;
+        const baseSpeed = 14 + Math.random() * 4;
+
+        setBirds([
+            // Leader
+            { id: 0, x: -20, y: leaderY, delay: baseDelay, speed: baseSpeed, scale: 0.7 },
+            // Top-Back
+            { id: 1, x: -20, y: leaderY - 5, delay: baseDelay + 0.3, speed: baseSpeed, scale: 0.5 },
+            // Bottom-Back
+            { id: 2, x: -20, y: leaderY + 5, delay: baseDelay + 0.3, speed: baseSpeed, scale: 0.5 },
+        ]);
+    }, [info.baseSeason, airtemp < 8]);
+    return birds;
 }
 
 function useFireflies(info: SeasonInfo, hour: number, airtemp: number) {
@@ -436,6 +469,7 @@ function useFireflies(info: SeasonInfo, hour: number, airtemp: number) {
     useEffect(() => {
         const isEvening = hour >= 19 || hour <= 5;
         if (!isEvening || info.baseSeason === "winter" || airtemp < 8) { setFlies([]); return; }
+
         const count = info.baseSeason === "summer" ? 8 : 4;
         setFlies(Array.from({ length: count }).map((_, i) => ({
             id: i, x: 10 + Math.random() * 70, y: 30 + Math.random() * 50,
@@ -449,13 +483,14 @@ function useFireflies(info: SeasonInfo, hour: number, airtemp: number) {
 // ✦  SVG SHAPE COMPONENTS
 // ═══════════════════════════════════════════════════════════════════
 
-function SvgLeafShape({ cx, cy, r, fill, opacity, angle, className }: {
+const SvgLeafShape = memo(function SvgLeafShape({ cx, cy, r, fill, opacity, angle, className, style }: {
     cx: number; cy: number; r: number; fill: string;
     opacity: number; angle: number; className?: string;
+    style?: React.CSSProperties;
 }) {
     const scale = r / 12;
     return (
-        <g transform={`translate(${cx},${cy}) rotate(${angle}) scale(${scale})`}>
+        <g transform={`translate(${cx},${cy}) rotate(${angle}) scale(${scale})`} style={style}>
             <g className={className}>
                 <path
                     d="M0,-12 C4,-10 8,-4 8,0 C8,6 4,12 0,12 C-4,12 -8,6 -8,0 C-8,-4 -4,-10 0,-12Z"
@@ -468,9 +503,9 @@ function SvgLeafShape({ cx, cy, r, fill, opacity, angle, className }: {
             </g>
         </g>
     );
-}
+});
 
-function SvgFlowerShape({ cx, cy, size, color, petalCount, delay }: {
+const SvgFlowerShape = memo(function SvgFlowerShape({ cx, cy, size, color, petalCount, delay }: {
     cx: number; cy: number; size: number; color: string;
     petalCount: number; delay: number;
 }) {
@@ -488,7 +523,33 @@ function SvgFlowerShape({ cx, cy, size, color, petalCount, delay }: {
             </g>
         </g>
     );
-}
+});
+
+const SvgBirdShape = memo(function SvgBirdShape({ scale }: { scale: number }) {
+    return (
+        <motion.svg viewBox="0 0 40 20" width={40 * scale} height={20 * scale} overflow="visible">
+            {/* Side-profile Bird Silhouette */}
+            <g transform="translate(20, 10)">
+                {/* Body/Head/Tail */}
+                <path
+                    d="M-15,0 C-5,-2 5,-2 15,0 C5,2 -5,2 -15,0 Z M15,0 L18,-2 L18,2 Z"
+                    fill="white"
+                    opacity={0.9}
+                />
+                {/* Wings - side profile flap */}
+                <motion.path
+                    d="M-5,0 Q-10,-15 5,-5"
+                    fill="none"
+                    stroke="white"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    animate={{ d: ["M-5,0 Q-10,-15 5,-5", "M-5,0 Q-10,15 5,5", "M-5,0 Q-10,-15 5,-5"] }}
+                    transition={{ repeat: Infinity, duration: 0.5, ease: "easeInOut" }}
+                />
+            </g>
+        </motion.svg>
+    );
+});
 
 // ═══════════════════════════════════════════════════════════════════
 // ✦  MAIN COMPONENT
@@ -506,7 +567,7 @@ export default function TreeVisualizer({ airtemp, windspeed, stream, snowDepth, 
 
     const { branches, leaves } = useMemo(() => buildTree(), []);
     const fallingLeaves = useFallingLeaves(windspeed, seasonInfo);
-    const butterflies = useButterflies(seasonInfo, airtemp);
+    const birds = useBirds(seasonInfo, airtemp);
     const fireflies = useFireflies(seasonInfo, hour, airtemp);
 
     // Ground elements react to the season info (gradual colors/density)
@@ -531,6 +592,8 @@ export default function TreeVisualizer({ airtemp, windspeed, stream, snowDepth, 
             style={{
                 "--grass-sway": `${grassSwayDeg}deg`,
                 "--grass-speed": `${grassSwaySpeed}s`,
+                "--wind-x": `${Math.min(windspeed * 0.8, 12)}px`,
+                "--wind-y": `${Math.min(windspeed * 0.4, 6)}px`,
             } as React.CSSProperties}
         >
             {/* Falling leaves — realistic shapes with flutter */}
@@ -557,50 +620,28 @@ export default function TreeVisualizer({ airtemp, windspeed, stream, snowDepth, 
                 />
             ))}
 
-            {/* Butterflies — SVG wing shapes */}
-            {butterflies.map(b => (
+            {/* Forest Birds — Soaring across with undulation */}
+            {birds.map(b => (
                 <motion.div
-                    key={b.id} className="absolute pointer-events-none"
-                    style={{ width: 28, height: 20 }}
-                    initial={{ left: `${b.x}vw`, top: "60vh", opacity: 0 }}
+                    key={`bird-${b.id}`}
+                    className="absolute pointer-events-none z-0"
+                    initial={{ left: "-20vw", top: `${b.y}vh`, opacity: 0 }}
                     animate={{
-                        top: ["65vh", "35vh", "55vh", "25vh"],
-                        left: [`${b.x}vw`, `${b.x + 6}vw`, `${b.x - 4}vw`, `${b.x + 9}vw`],
-                        opacity: [0, 1, 1, 0.8, 0]
+                        left: "120vw",
+                        top: [`${b.y}vh`, `${b.y - 3}vh`, `${b.y}vh`, `${b.y - 2}vh`, `${b.y}vh`], // Undulating flight
+                        opacity: [0, 1, 1, 1, 0]
                     }}
-                    transition={{ duration: 7 + Math.random() * 4, repeat: Infinity, delay: b.delay, ease: "easeInOut" }}
+                    transition={{
+                        left: { duration: b.speed, repeat: Infinity, delay: b.delay, ease: "linear" },
+                        top: { duration: 3, repeat: Infinity, ease: "easeInOut" },
+                        opacity: { duration: b.speed, repeat: Infinity, delay: b.delay, ease: "linear" }
+                    }}
                 >
-                    <motion.svg viewBox="0 0 28 20" width="28" height="20"
-                        animate={{ scaleX: [1, -1, 1] }}
-                        transition={{ duration: 0.25, repeat: Infinity, ease: "easeInOut" }}
-                    >
-                        {/* Left upper wing */}
-                        <path d="M14,10 C10,4 2,2 1,7 C0,12 6,14 14,10Z" fill={b.color} opacity={0.85} />
-                        {/* Left lower wing */}
-                        <path d="M14,10 C10,13 4,17 5,19 C7,21 12,16 14,10Z" fill={b.color} opacity={0.7} />
-                        {/* Right upper wing */}
-                        <path d="M14,10 C18,4 26,2 27,7 C28,12 22,14 14,10Z" fill={b.color} opacity={0.85} />
-                        {/* Right lower wing */}
-                        <path d="M14,10 C18,13 24,17 23,19 C21,21 16,16 14,10Z" fill={b.color} opacity={0.7} />
-                        {/* Body */}
-                        <ellipse cx="14" cy="10" rx="1.2" ry="5" fill="#1a0a00" opacity={0.8} />
-                        {/* Antennae */}
-                        <line x1="14" y1="5" x2="11" y2="1" stroke="#1a0a00" strokeWidth="0.5" />
-                        <line x1="14" y1="5" x2="17" y2="1" stroke="#1a0a00" strokeWidth="0.5" />
-                        <circle cx="11" cy="1" r="0.7" fill="#1a0a00" />
-                        <circle cx="17" cy="1" r="0.7" fill="#1a0a00" />
-                    </motion.svg>
+                    <SvgBirdShape scale={b.scale} />
                 </motion.div>
             ))}
 
-            {/* Fireflies — summer/autumn evenings */}
-            {fireflies.map(f => (
-                <div key={`ff-${f.id}`} className="firefly" style={{
-                    left: `${f.x}vw`, top: `${f.y}vh`,
-                    width: f.size, height: f.size, backgroundColor: "#fef08a",
-                    animationDelay: `${f.delay}s, ${f.delay + 1}s`,
-                }} />
-            ))}
+
 
             {/* SVG Canvas */}
             <svg viewBox="0 0 1000 400" className="tv-svg absolute inset-0 w-full h-full"
@@ -700,14 +741,14 @@ export default function TreeVisualizer({ airtemp, windspeed, stream, snowDepth, 
                                     // depth 3 = inner branches
                                     // Edge-first growth: tips appear at low density, inner leaves appear later.
                                     // Edge-last shedding: density drops, inner leaves fall first, tips remain.
-                                    
+
                                     // Base threshold for this leaf's depth (1 -> 0, 3 -> 0.7)
                                     const depthBase = (leaf.branchDepth - 1) * 0.35;
                                     // Add unique jitter so they don't pop in/out in batches
                                     const visibilityThreshold = Math.min(0.95, depthBase + (leaf.dropThreshold * 0.3));
-                                    
+
                                     if (seasonInfo.foliageDensity < visibilityThreshold) return null;
-                                    
+
                                     const color = seasonInfo.leafColors.length > 0
                                         ? seasonInfo.leafColors[i % seasonInfo.leafColors.length]
                                         : "#15803d";
@@ -715,9 +756,9 @@ export default function TreeVisualizer({ airtemp, windspeed, stream, snowDepth, 
                                     // Cherry blossom (spring only, controlled by blossomDensity)
                                     if (leaf.isBlossom && seasonInfo.blossomDensity > 0 && Math.random() < seasonInfo.blossomDensity) {
                                         return (
-                                            <motion.g key={i}
-                                                animate={{ scale: [1, 1.1, 1] }}
-                                                transition={{ repeat: Infinity, duration: 2 + Math.random() }}>
+                                            <g key={i} className="leaf-sway" style={{
+                                                "--leaf-duration": `${2.5 + Math.random() * 2}s`,
+                                            } as React.CSSProperties}>
                                                 {[0, 72, 144, 216, 288].map((a, pi) => (
                                                     <ellipse key={pi}
                                                         cx={leaf.cx + Math.cos(a * Math.PI / 180) * leaf.r * 0.4}
@@ -728,17 +769,23 @@ export default function TreeVisualizer({ airtemp, windspeed, stream, snowDepth, 
                                                     />
                                                 ))}
                                                 <circle cx={leaf.cx} cy={leaf.cy} r={leaf.r * 0.15} fill="#fbbf24" opacity={0.9} />
-                                            </motion.g>
+                                            </g>
                                         );
                                     }
 
+                                    // Use seeded dropThreshold (0~1) for a stable, fixed duration per leaf
+                                    const leafDuration = (2 + leaf.dropThreshold * 3).toFixed(2);
                                     return (
-                                        <motion.g key={i}
-                                            animate={{ scale: [1, 1 + windspeed * 0.01, 1] }}
-                                            transition={{ repeat: Infinity, duration: 2 + Math.random(), ease: "easeInOut" }}>
-                                            <SvgLeafShape cx={leaf.cx} cy={leaf.cy} r={leaf.r}
-                                                fill={color} opacity={leaf.opacity} angle={leaf.angle} />
-                                        </motion.g>
+                                        <SvgLeafShape
+                                            key={i}
+                                            cx={leaf.cx} cy={leaf.cy} r={leaf.r}
+                                            fill={color} opacity={leaf.opacity} angle={leaf.angle}
+                                            className="leaf-sway"
+                                            style={{
+                                                // Fixed duration per leaf — no Math.random() to avoid animation resets on re-render
+                                                "--leaf-duration": `${leafDuration}s`,
+                                            } as React.CSSProperties}
+                                        />
                                     );
                                 })}
                             </motion.g>
@@ -782,7 +829,27 @@ export default function TreeVisualizer({ airtemp, windspeed, stream, snowDepth, 
                     </>
                 )}
 
-
+                {/* Fireflies — simple position-based blinking around the tree */}
+                {fireflies.map(f => (
+                    <motion.circle
+                        key={`ff-${f.id}`}
+                        cx={`${f.x}%`}
+                        cy={`${f.y}%`}
+                        r={f.size / 2}
+                        fill="#fde047"
+                        style={{ filter: "blur(2px)" }}
+                        animate={{
+                            opacity: [0, 1, 0.2, 0.9, 0],
+                            r: [f.size / 2, f.size * 0.8, f.size / 2],
+                        }}
+                        transition={{
+                            duration: 2 + Math.random() * 2,
+                            repeat: Infinity,
+                            delay: f.delay,
+                            ease: "easeInOut",
+                        }}
+                    />
+                ))}
             </svg>
         </div>
     );

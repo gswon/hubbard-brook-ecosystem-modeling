@@ -1,6 +1,7 @@
 "use client";
+import { motion, AnimatePresence } from "framer-motion";
 
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import TreeVisualizer from "./TreeVisualizer";
 import WeatherEffects from "./WeatherEffects";
 import { Loader2, Play, Pause, Calendar, Radio, RefreshCw, Wind, Thermometer, Droplets, Sun } from "lucide-react";
@@ -56,11 +57,193 @@ const METRIC_DISPLAY: { key: keyof WeatherData; label: string; unit: string; dec
     { key: "snow", label: "Snow", unit: "mm", decimals: 1 },
 ];
 
+// ------------------------------------------------------------------
+// Sub-components to prevent glitches (remounting)
+// ------------------------------------------------------------------
+interface DetailModalProps {
+    selectedMetric: string;
+    data: WeatherData | null;
+    dailyData: WeatherData[];
+    activeIndex: number | null;
+    setActiveIndex: (idx: number | null) => void;
+    hoveredIndex: number | null;
+    setHoveredIndex: (idx: number | null) => void;
+    onClose: () => void;
+}
+
+function DetailModal({ 
+    selectedMetric, data, dailyData, activeIndex, setActiveIndex, hoveredIndex, setHoveredIndex, onClose 
+}: DetailModalProps) {
+    const config = METRIC_DISPLAY.find(m => m.key === selectedMetric);
+    if (!config || !data) return null;
+
+    const values = dailyData.map(d => d[config.key] as number);
+    const min = Math.min(...values);
+    const max = Math.max(...values);
+    const range = max - min || 1;
+
+    // Use internal chart dimensions
+    const chartWidth = 600;
+    const chartHeight = 200;
+    const padding = 40;
+    const innerW = chartWidth - padding * 2;
+    const innerH = chartHeight - padding * 2;
+
+    // Memoize points to handle data updates without flickering
+    const points = useMemo(() => {
+        return values.map((v, i) => {
+            const x = padding + (i / (values.length - 1)) * innerW;
+            const y = padding + innerH - ((v - min) / range) * innerH;
+            return { x, y, val: v };
+        });
+    }, [values, min, max, range, innerW, innerH]);
+
+    const path = `M${points[0].x},${points[0].y} ` + points.slice(1).map(p => `L${p.x},${p.y}`).join(" ");
+    const areaPath = `${path} L${points[points.length - 1].x},${chartHeight - padding} L${points[0].x},${chartHeight - padding} Z`;
+
+    const activePoint = activeIndex !== null ? points[activeIndex] : null;
+
+    return (
+        <motion.div
+            initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[100] flex items-center justify-center p-6 bg-slate-950/40 backdrop-blur-xl pointer-events-auto"
+        >
+            <motion.div
+                initial={{ scale: 0.9, y: 20 }} animate={{ scale: 1, y: 0 }} exit={{ scale: 0.9, y: 20 }}
+                onClick={(e) => e.stopPropagation()}
+                className="glass-panel w-full max-w-4xl p-8 rounded-[2.5rem] border border-white/20 shadow-2xl relative"
+            >
+                <button
+                    onClick={onClose}
+                    className="absolute top-6 right-8 text-white/40 hover:text-white transition-colors p-2 z-[110]"
+                >
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                        <line x1="18" y1="6" x2="6" y2="18"></line>
+                        <line x1="6" y1="6" x2="18" y2="18"></line>
+                    </svg>
+                </button>
+
+                <div className="mb-10">
+                    <div className="flex items-center gap-3 mb-2">
+                        <div className="w-10 h-10 rounded-2xl bg-teal-500/20 flex items-center justify-center border border-teal-500/30">
+                            {config.key === 'airtemp' ? <Thermometer className="w-5 h-5 text-teal-400" /> :
+                             config.key === 'windspeed' ? <Wind className="w-5 h-5 text-teal-400" /> :
+                             config.key === 'precip' ? <Droplets className="w-5 h-5 text-teal-400" /> :
+                             <Sun className="w-5 h-5 text-teal-400" />}
+                        </div>
+                        <h2 className="text-3xl font-light tracking-tight text-white">{config.label} <span className="text-white/30">Trends</span></h2>
+                    </div>
+                    <p className="text-sm text-white/40 tracking-wider font-mono">24-HOUR ANALYSIS • {data.date}</p>
+                </div>
+
+                <div className="grid grid-cols-3 gap-6 mb-10">
+                    <div className="bg-white/5 p-4 rounded-2xl border border-white/5">
+                        <div className="text-[10px] text-white/30 uppercase tracking-widest mb-1">Current</div>
+                        <div className="text-2xl font-mono text-white">{(data[config.key] as number).toFixed(config.decimals)}{config.unit}</div>
+                    </div>
+                    <div className="bg-white/5 p-4 rounded-2xl border border-white/5">
+                        <div className="text-[10px] text-white/30 uppercase tracking-widest mb-1">Peak</div>
+                        <div className="text-2xl font-mono text-emerald-400">{max.toFixed(config.decimals)}{config.unit}</div>
+                    </div>
+                    <div className="bg-white/5 p-4 rounded-2xl border border-white/5">
+                        <div className="text-[10px] text-white/30 uppercase tracking-widest mb-1">Low</div>
+                        <div className="text-2xl font-mono text-teal-400">{min.toFixed(config.decimals)}{config.unit}</div>
+                    </div>
+                </div>
+
+                <div className="relative w-full aspect-[3/1] bg-black/20 rounded-3xl border border-white/5 overflow-hidden group">
+                    <svg viewBox={`0 0 ${chartWidth} ${chartHeight}`} className="w-full h-full">
+                        <defs>
+                            <linearGradient id="modalChartGrad" x1="0" y1="0" x2="0" y2="1">
+                                <stop offset="0%" stopColor="#2dd4bf" stopOpacity="0.3" />
+                                <stop offset="100%" stopColor="#2dd4bf" stopOpacity="0" />
+                            </linearGradient>
+                        </defs>
+                        {[0, 0.25, 0.5, 0.75, 1].map(f => (
+                            <line key={f} x1={padding} y1={padding + innerH * f} x2={chartWidth - padding} y2={padding + innerH * f} stroke="rgba(255,255,255,0.05)" strokeWidth="1" />
+                        ))}
+                        <path d={areaPath} fill="url(#modalChartGrad)" />
+                        <path d={path} fill="none" stroke="#2dd4bf" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
+
+                        <AnimatePresence>
+                            {hoveredIndex !== null && points[hoveredIndex] && (
+                                <motion.line
+                                    initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+                                    x1={points[hoveredIndex].x} y1={padding} x2={points[hoveredIndex].x} y2={chartHeight - padding}
+                                    stroke="rgba(45, 212, 191, 0.3)" strokeWidth="1" strokeDasharray="4 4"
+                                />
+                            )}
+                        </AnimatePresence>
+
+                        {points.map((p, i) => (
+                            <g key={i}>
+                                <rect
+                                    x={p.x - innerW / 48} y={padding}
+                                    width={innerW / 24} height={innerH}
+                                    fill="transparent"
+                                    onMouseEnter={() => setHoveredIndex(i)}
+                                    onMouseLeave={() => setHoveredIndex(null)}
+                                    onClick={() => setActiveIndex(i === activeIndex ? null : i)}
+                                    className="cursor-pointer"
+                                />
+                                <motion.circle
+                                    cx={p.x} cy={p.y}
+                                    animate={{ 
+                                        r: i === activeIndex ? 6 : i === hoveredIndex ? 4 : 0,
+                                        fill: i === activeIndex ? "#2dd4bf" : "white",
+                                        stroke: "#2dd4bf",
+                                        strokeWidth: i === activeIndex ? 4 : 2
+                                    }}
+                                    className="pointer-events-none"
+                                />
+                            </g>
+                        ))}
+                    </svg>
+
+                    <AnimatePresence>
+                        {activePoint && (
+                            <motion.div
+                                initial={{ opacity: 0, y: 10, scale: 0.9 }}
+                                animate={{ opacity: 1, y: 0, scale: 1 }}
+                                exit={{ opacity: 0, y: 10, scale: 0.9 }}
+                                style={{ 
+                                    position: 'absolute',
+                                    left: `${(activePoint.x / chartWidth) * 100}%`,
+                                    top: `${(activePoint.y / chartHeight) * 100}%`,
+                                    transform: 'translate(-50%, -130%)'
+                                }}
+                                className="bg-slate-900/90 border border-teal-500/50 backdrop-blur-md px-3 py-1.5 rounded-xl shadow-xl pointer-events-none z-50 whitespace-nowrap"
+                            >
+                                <div className="text-[10px] text-teal-400 font-mono font-bold">{activeIndex}:00</div>
+                                <div className="text-sm font-mono text-white">
+                                    {activePoint.val.toFixed(config.decimals)}
+                                    <span className="text-[10px] ml-1 opacity-60">{config.unit}</span>
+                                </div>
+                                <div className="absolute -bottom-1 left-1/2 -translate-x-1/2 w-2 h-2 bg-slate-900/90 border-r border-b border-teal-500/50 rotate-45" />
+                            </motion.div>
+                        )}
+                    </AnimatePresence>
+
+                    <div className="absolute bottom-4 left-[40px] right-[40px] flex justify-between text-[10px] text-white/20 font-mono tracking-widest">
+                        <span>00:00</span>
+                        <span>06:00</span>
+                        <span>12:00</span>
+                        <span>18:00</span>
+                        <span>23:00</span>
+                    </div>
+                </div>
+            </motion.div>
+        </motion.div>
+    );
+}
+
 export default function WeatherVisualizer() {
     const [data, setData] = useState<WeatherData | null>(null);
     const [summary, setSummary] = useState<WeatherSummary | null>(null);
     const [dailyData, setDailyData] = useState<WeatherData[]>([]);
     const [loading, setLoading] = useState(true);
+    const [narration, setNarration] = useState<string | null>(null);
+    const [narrationLoading, setNarrationLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [dateRange, setDateRange] = useState<DateRange>({ start: "2024-01-01", end: "2024-12-31" });
 
@@ -68,11 +251,16 @@ export default function WeatherVisualizer() {
     const [currentDate, setCurrentDate] = useState("2024-01-05");
     const [currentHour, setCurrentHour] = useState(12);
     const [isPlaying, setIsPlaying] = useState(false);
+    const [isNarrationOpen, setIsNarrationOpen] = useState(false);
     const playIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
     // Live mode
     const [isLive, setIsLive] = useState(false);
     const [lastLiveUpdate, setLastLiveUpdate] = useState<Date | null>(null);
+    const [selectedMetric, setSelectedMetric] = useState<string | null>(null);
+    const [hoveredIndex, setHoveredIndex] = useState<number | null>(null);
+    const [activeIndex, setActiveIndex] = useState<number | null>(null);
+
     const liveIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
     // ------------------------------------------------------------------
@@ -101,6 +289,26 @@ export default function WeatherVisualizer() {
             setLoading(false);
         }
     }, []);
+
+    const fetchNarration = useCallback(async () => {
+        if (!currentDate) return;
+        setIsPlaying(false); // Auto-pause on request
+        setNarrationLoading(true);
+        try {
+            const narRes = await fetch(`${API}/weather-narration?date=${currentDate}&hour=${currentHour}`);
+            if (narRes.ok) {
+                const narData = await narRes.json();
+                setNarration(narData.narration);
+            } else {
+                setNarration("The forest is silent for this period... (No analysis available)");
+            }
+        } catch (err) {
+            console.error("Narration fetch failed", err);
+            setNarration("Could not reach the AI ecosystem analyzer.");
+        } finally {
+            setNarrationLoading(false);
+        }
+    }, [currentDate, currentHour]);
 
     const fetchLive = useCallback(async () => {
         setError(null);
@@ -188,32 +396,23 @@ export default function WeatherVisualizer() {
     // ------------------------------------------------------------------
     const handleLiveToggle = () => setIsLive((v) => !v);
 
-    const summaryCardColor = (level: string) => {
-        if (level === "severe") return "bg-red-950/70 border-red-500/40";
-        if (level === "moderate") return "bg-orange-950/70 border-orange-500/40";
-        return "bg-blue-950/70 border-blue-500/40";
-    };
-    const summaryTitleColor = (level: string) => {
-        if (level === "severe") return "text-red-300";
-        if (level === "moderate") return "text-orange-300";
-        return "text-blue-300";
-    };
-    const summaryIcon = (level: string) => {
-        if (level === "severe") return "⚠️";
-        if (level === "moderate") return "🌤";
-        return "☀️";
-    };
-    const valuesBg = (level: string) => {
-        if (level === "severe") return "bg-red-950/50";
-        if (level === "moderate") return "bg-orange-950/50";
-        return "bg-blue-950/50";
-    };
-
-    // ------------------------------------------------------------------
-    // Render
-    // ------------------------------------------------------------------
     return (
         <div className="wv-container">
+            <AnimatePresence>
+                {selectedMetric && (
+                    <DetailModal 
+                        selectedMetric={selectedMetric}
+                        data={data}
+                        dailyData={dailyData}
+                        activeIndex={activeIndex}
+                        setActiveIndex={setActiveIndex}
+                        hoveredIndex={hoveredIndex}
+                        setHoveredIndex={setHoveredIndex}
+                        onClose={() => { setSelectedMetric(null); setActiveIndex(null); setHoveredIndex(null); }}
+                    />
+                )}
+            </AnimatePresence>
+
             {/* Background layers */}
             {data && (
                 <>
@@ -248,7 +447,66 @@ export default function WeatherVisualizer() {
                 {/* Right side container for all UI elements - Compact and Bottom-Right aligned */}
                 <div className="w-full max-w-[38rem] flex flex-col gap-4 pointer-events-auto">
 
-                    {/* Alerts Stack (Removed) */}
+                    {/* AI Narration Card */}
+                    <AnimatePresence mode="wait">
+                        {isNarrationOpen && (
+                            <motion.div
+                                initial={{ opacity: 0, y: 20, scale: 0.95 }}
+                                animate={{ opacity: 1, y: 0, scale: 1 }}
+                                exit={{ opacity: 0, y: 10, scale: 0.95 }}
+                                className="glass-panel w-full border border-white/10 p-5 rounded-[1.5rem] shadow-2xl relative overflow-hidden group mb-2"
+                            >
+                                <div className="absolute top-0 left-0 w-1 h-full bg-teal-500/50" />
+                                <div className="flex items-start gap-4">
+                                    <div className="mt-1 flex-shrink-0">
+                                        <div className="w-8 h-8 rounded-full bg-teal-500/20 flex items-center justify-center border border-teal-500/30">
+                                            <Radio className={`w-4 h-4 text-teal-300 ${narrationLoading ? 'animate-pulse' : ''}`} />
+                                        </div>
+                                    </div>
+                                    <div className="flex-1">
+                                        <div className="flex items-center justify-between mb-2">
+                                            <span className="text-[10px] tracking-[0.2em] text-teal-400 font-bold uppercase">AI Ecosystem Observation</span>
+                                            {narrationLoading && <div className="text-[10px] text-white/40 italic flex items-center gap-1"><RefreshCw className="w-2 h-2 animate-spin" /> Decoding forest whispers...</div>}
+                                            <button 
+                                                onClick={() => setIsNarrationOpen(false)}
+                                                className="text-white/20 hover:text-white/60 transition-colors"
+                                            >
+                                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+                                            </button>
+                                        </div>
+
+                                        {!narration && !narrationLoading ? (
+                                            <div className="py-4 flex flex-col items-center gap-4">
+                                                <p className="text-sm text-white/40 text-center italic">Observing the silent woods. Would you like an AI analysis of this moment?</p>
+                                                <button
+                                                    onClick={fetchNarration}
+                                                    className="px-6 py-2.5 rounded-full bg-teal-500/20 hover:bg-teal-500/30 border border-teal-500/40 text-teal-300 text-xs font-bold tracking-widest uppercase transition-all shadow-[0_0_15px_rgba(20,184,166,0.1)] hover:shadow-[0_0_20px_rgba(20,184,166,0.3)] active:scale-95"
+                                                >
+                                                    Get Current Weather Observation
+                                                </button>
+                                            </div>
+                                        ) : (
+                                            <div className="text-sm md:text-base text-slate-200 leading-relaxed font-light italic">
+                                                {narrationLoading ? (
+                                                    <span className="opacity-40">Connecting to the forest network...</span>
+                                                ) : (
+                                                    <div className="flex flex-col gap-4">
+                                                        <span>{narration}</span>
+                                                        <button
+                                                            onClick={fetchNarration}
+                                                            className="self-end text-[10px] text-teal-400/60 hover:text-teal-400 uppercase tracking-widest flex items-center gap-1 transition-colors"
+                                                        >
+                                                            <RefreshCw className="w-3 h-3" /> Update Observation
+                                                        </button>
+                                                    </div>
+                                                )}
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
+                            </motion.div>
+                        )}
+                    </AnimatePresence>
 
                     {/* Main glass control panel */}
                     <div className="glass-panel w-full flex flex-col justify-between shadow-[0_32px_64px_-16px_rgba(0,0,0,0.5)] relative border border-white/10 p-6 rounded-[2rem] overflow-hidden">
@@ -264,15 +522,29 @@ export default function WeatherVisualizer() {
                                 <p className="text-[10px] tracking-[0.2em] text-white/40 mt-1 uppercase">Forest Ecosystem Monitor</p>
                             </div>
                             <div className="flex flex-col items-end gap-2 text-xs">
-                                <button onClick={handleLiveToggle} className={`flex items-center gap-2 px-4 py-1.5 rounded-full border transition-all ${isLive ? "bg-emerald-500/20 border-emerald-500/50 text-emerald-300" : "bg-white/5 border-white/10 text-slate-300 hover:bg-white/10"}`}>
-                                    {isLive && (
-                                        <span className="relative flex h-2 w-2">
-                                            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-                                            <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
-                                        </span>
-                                    )}
-                                    <span className="font-medium tracking-wider">{isLive ? "LIVE" : "GO LIVE"}</span>
-                                </button>
+                                <div className="flex gap-2">
+                                    <button 
+                                        onClick={() => {
+                                            const next = !isNarrationOpen;
+                                            setIsNarrationOpen(next);
+                                            if (next) setIsPlaying(false); // Pause if opening observer
+                                        }} 
+                                        className={`flex items-center gap-2 px-4 py-1.5 rounded-full border transition-all ${isNarrationOpen ? "bg-teal-500/20 border-teal-500/50 text-teal-300" : "bg-white/5 border-white/10 text-slate-300 hover:bg-white/10"}`}
+                                        title="AI Narration"
+                                    >
+                                        <Radio className={`w-3.5 h-3.5 ${isNarrationOpen ? 'animate-pulse' : ''}`} />
+                                        <span className="font-medium tracking-wider">{isNarrationOpen ? "HIDE AI" : "AI OBSERVER"}</span>
+                                    </button>
+                                    <button onClick={handleLiveToggle} className={`flex items-center gap-2 px-4 py-1.5 rounded-full border transition-all ${isLive ? "bg-emerald-500/20 border-emerald-500/50 text-emerald-300" : "bg-white/5 border-white/10 text-slate-300 hover:bg-white/10"}`}>
+                                        {isLive && (
+                                            <span className="relative flex h-2 w-2">
+                                                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                                                <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+                                            </span>
+                                        )}
+                                        <span className="font-medium tracking-wider">{isLive ? "LIVE" : "GO LIVE"}</span>
+                                    </button>
+                                </div>
                                 {isLive && lastLiveUpdate && (
                                     <span className="text-[10px] text-white/40 uppercase font-mono tracking-wider">
                                         Upd: {lastLiveUpdate.toLocaleTimeString()}
@@ -292,47 +564,65 @@ export default function WeatherVisualizer() {
                                             value={currentDate}
                                             min={dateRange.start}
                                             max={dateRange.end}
-                                            onChange={(e) => setCurrentDate(e.target.value || dateRange.start)}
+                                            onChange={(e) => {
+                                                setCurrentDate(e.target.value || dateRange.start);
+                                                setIsPlaying(false);
+                                            }}
                                             className="bg-white/5 hover:bg-white/10 transition-colors pl-9 pr-3 py-1.5 text-xs text-slate-200 rounded-lg border border-white/10 focus:outline-none focus:ring-1 focus:ring-teal-500/50"
                                             style={{ colorScheme: "dark" }}
                                         />
                                     </div>
                                     <div className="text-lg font-bold font-mono tracking-tight text-white drop-shadow-md">
-                                        @ {currentHour.toString().padStart(2, "0")}:00
+                                        {currentHour.toString().padStart(2, "0")}:00
                                     </div>
                                 </>
                             ) : data ? (
                                 <div className="flex w-full justify-between items-center text-emerald-400 font-mono text-sm">
                                     <span className="font-bold">{data.date}</span>
-                                    <span className="text-lg font-bold">@ {data.hour.toString().padStart(2, "0")}:00</span>
+                                    <span className="text-lg font-bold">{data.hour.toString().padStart(2, "0")}:00</span>
                                 </div>
                             ) : null}
                         </div>
 
                         {/* Playback Controls & Timeline */}
                         {!isLive && (
-                            <div className="flex flex-col gap-3 mb-8 w-full">
-                                <div className="flex items-center justify-between text-[10px] font-medium text-white/40 font-mono">
-                                    <button
-                                        onClick={() => setIsPlaying(!isPlaying)}
-                                        className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-white/10 hover:bg-white/20 transition-all text-white border border-white/10 cursor-pointer"
-                                        disabled={loading}
-                                    >
-                                        {isPlaying ? <Pause className="w-3 h-3" /> : <Play className="w-3 h-3" />}
-                                        <span className="uppercase tracking-widest">{isPlaying ? 'Pause' : 'Play'}</span>
-                                    </button>
-                                    <span>0:00</span>
-                                    <span>12:00</span>
-                                    <span>23:00</span>
+                            <div className="flex items-center gap-6 mb-10 w-full px-1">
+                                <motion.button
+                                    whileHover={{ scale: 1.05, backgroundColor: "rgba(255,255,255,0.15)" }}
+                                    whileTap={{ scale: 0.95 }}
+                                    onClick={() => {
+                                        const nextPlaying = !isPlaying;
+                                        setIsPlaying(nextPlaying);
+                                        if (nextPlaying) setIsNarrationOpen(false); // Auto-hide observer on play
+                                    }}
+                                    className="flex items-center justify-center gap-2.5 px-5 py-2 rounded-full bg-white/10 text-white border border-white/20 shadow-[0_0_15px_rgba(255,255,255,0.05)] cursor-pointer min-w-[7rem] h-10 backdrop-blur-md transition-shadow hover:shadow-[0_0_20px_rgba(20,184,166,0.3)] group"
+                                    disabled={loading}
+                                >
+                                    <div className="flex items-center justify-center w-5 h-5 rounded-full bg-teal-500/20 group-hover:bg-teal-500/40 transition-colors">
+                                        {isPlaying ? <Pause className="w-3 h-3 text-teal-300" /> : <Play className="w-3 h-3 text-teal-300 fill-teal-300" />}
+                                    </div>
+                                    <span className="uppercase tracking-[0.15em] text-[10px] font-bold">
+                                        {isPlaying ? 'Pause' : 'Play'}
+                                    </span>
+                                </motion.button>
+
+                                <div className="flex-1 flex flex-col gap-2">
+                                    <div className="flex justify-between text-[10px] font-medium text-white/30 font-mono px-0.5">
+                                        <span>0:00</span>
+                                        <span>06:00</span>
+                                        <span>12:00</span>
+                                        <span>18:00</span>
+                                        <span>23:00</span>
+                                    </div>
+                                    <input
+                                        type="range"
+                                        min="0"
+                                        max="23"
+                                        value={currentHour}
+                                        onChange={(e) => setCurrentHour(parseInt(e.target.value))}
+                                        className="wv-slider w-full"
+                                    />
                                 </div>
-                                <input
-                                    type="range"
-                                    min="0"
-                                    max="23"
-                                    value={currentHour}
-                                    onChange={(e) => setCurrentHour(parseInt(e.target.value))}
-                                    className="wv-slider mt-2"
-                                />
                             </div>
                         )}
 
@@ -367,16 +657,20 @@ export default function WeatherVisualizer() {
                                 }
 
                                 return (
-                                    <div key={key} className="wv-metric-cell">
-                                        <span className="wv-metric-label">{label}</span>
+                                    <button
+                                        key={key}
+                                        onClick={() => setSelectedMetric(key as string)}
+                                        className="wv-metric-cell text-left hover:bg-white/10 hover:scale-[1.03] active:scale-[0.98] transition-all cursor-pointer group"
+                                    >
+                                        <span className="wv-metric-label group-hover:text-teal-300 transition-colors">{label}</span>
                                         <span className="wv-metric-value mb-1">
                                             {typeof val === "number" ? val.toFixed(decimals) : "—"}
                                             <span className="wv-metric-unit">{unit}</span>
                                         </span>
-                                        <svg width="40" height="14" className="opacity-40 mt-auto overflow-visible">
+                                        <svg width="40" height="14" className="opacity-40 group-hover:opacity-100 transition-opacity mt-auto overflow-visible">
                                             {sparkPath && <path d={sparkPath} fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />}
                                         </svg>
-                                    </div>
+                                    </button>
                                 );
                             })}
                         </div>
