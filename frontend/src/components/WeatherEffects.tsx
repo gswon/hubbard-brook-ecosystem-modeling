@@ -59,12 +59,13 @@ function useCloudHaze(rh: number, precip: number) {
 function useRainDrops(precip: number, windspeed: number) {
     return useMemo(() => {
         if (precip <= 0) return [];
-        const count = clamp(Math.floor(precip * 120), 20, 400);
+        // MASSIVELY reduce rain count to fix lag (from 400 down to 80), increase scale
+        const count = clamp(Math.floor(precip * 30), 10, 80);
         return Array.from({ length: count }).map((_, i) => ({
             id: i,
             x: -20 + Math.random() * 140,
             delay: Math.random() * 1.5,
-            scale: 0.6 + Math.random() * 1.2,
+            scale: 0.8 + Math.random() * 1.8,
             speed: 0.25 + Math.random() * 0.2 - windspeed * 0.01,
         }));
     }, [Math.round(precip * 20), Math.round(windspeed)]);
@@ -76,12 +77,13 @@ function useSnowFlakes(precip: number, airtemp: number, snowDepth: number) {
         // Show snow when precipitating AND either cold enough OR snow is already on the ground
         const shouldSnow = precip > 0 && (airtemp < 2 || snowDepth > 0);
         if (!shouldSnow) return [];
-        const count = clamp(Math.floor(precip * 200), 30, 350);
+        // Reduce snow count (from 350 to 100)
+        const count = clamp(Math.floor(precip * 60), 15, 100);
         return Array.from({ length: count }).map((_, i) => ({
             id: i,
             x: Math.random() * 110 - 5,
             delay: Math.random() * 4,
-            size: 4 + Math.random() * 10,
+            size: 6 + Math.random() * 14,
             wander: Math.random() * 30 - 15,
             speed: 2.5 + Math.random() * 2.5,
         }));
@@ -92,11 +94,12 @@ function useSnowFlakes(precip: number, airtemp: number, snowDepth: number) {
 function useWindStreaks(windspeed: number) {
     return useMemo(() => {
         if (windspeed < 1.5) return []; // Lower threshold
-        const count = clamp(Math.floor(windspeed * 5), 8, 80); // More streaks
+        // Reduce windstreak count
+        const count = clamp(Math.floor(windspeed * 2), 5, 40); 
         return Array.from({ length: count }).map((_, i) => ({
             id: i,
             top: 2 + Math.random() * 95,
-            len: 60 + Math.random() * 180, // Longer
+            len: 80 + Math.random() * 200, // Longer
             delay: Math.random() * 5,
             speed: clamp(1.2 - windspeed * 0.1, 0.15, 1.2) + Math.random() * 0.2, // Faster
             opacity: 0.12 + Math.random() * 0.2, // Brighter
