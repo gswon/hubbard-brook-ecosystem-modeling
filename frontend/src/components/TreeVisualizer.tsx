@@ -259,7 +259,8 @@ function buildTree(): { branches: Branch[]; leaves: TreeLeaf[] } {
 
     function grow(x: number, y: number, len: number, angle: number, thickness: number, depth: number) {
         if (depth === 0) return;
-        const bend = (Math.random() - 0.5) * 0.3;
+        // Make the base trunk perfectly vertical (depth 7) and balance early branches
+        const bend = depth >= 6 ? 0 : (Math.random() - 0.5) * 0.3;
         const a = angle + bend;
         const tx = x + len * Math.sin(a);
         const ty = y - len * Math.cos(a);
@@ -519,7 +520,8 @@ export default function TreeVisualizer({ airtemp, windspeed, stream, snowDepth, 
     // We will conditionally render leaves based on their internal dropThreshold.
 
     const swayDeg = windspeed < 0.5 ? 0 : Math.min(windspeed * 1.8, 18);
-    const swayDuration = Math.max(0.8, 4 - windspeed * 0.2);
+    // Speed up swaying proportionally to windspeed
+    const swayDuration = Math.max(2, 6 - windspeed * 0.3);
     const rainDroop = stream > 0.1 ? Math.min(stream * 20, 6) : 0;
     const trunkColor = seasonInfo.baseSeason === "winter" ? "#1f140e" : "#2a1c12";
 
@@ -659,12 +661,22 @@ export default function TreeVisualizer({ airtemp, windspeed, stream, snowDepth, 
                 {/* Tree structure - anchored exactly at root coordinates */}
                 <motion.g
                     style={{ originX: "200px", originY: "280px" }}
-                    animate={{
-                        rotate: swayDeg,
-                        skewX: swayDeg * 0.1,
-                        skewY: rainDroop * 0.1,
-                    }}
-                    transition={{ type: "spring", stiffness: 50, damping: 20 }}
+                    animate={
+                        swayDeg > 0 ? {
+                            rotate: [0, swayDeg, 0, -swayDeg * 0.3, 0],
+                            skewX: [0, swayDeg * 0.1, 0, -swayDeg * 0.03, 0],
+                            skewY: rainDroop * 0.1,
+                        } : {
+                            rotate: 0,
+                            skewX: 0,
+                            skewY: rainDroop * 0.1,
+                        }
+                    }
+                    transition={
+                        swayDeg > 0
+                            ? { duration: swayDuration, repeat: Infinity, ease: "easeInOut" }
+                            : { type: "spring", stiffness: 50, damping: 20 }
+                    }
                 >
                     {branches.map((b, i) => {
                         // Darken slightly for depth on finer branches
