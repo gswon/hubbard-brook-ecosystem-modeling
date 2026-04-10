@@ -246,6 +246,19 @@ body {
   100% { transform: rotateY(-30deg) rotateZ(-20deg) scale(1); }
 }
 
+/* ── Leaf Sway — CSS version for higher performance ── */
+.leaf-sway {
+  transform-origin: center center;
+  animation: leaf-sway-anim var(--leaf-duration, 3s) ease-in-out infinite alternate;
+  will-change: transform;
+}
+
+@keyframes leaf-sway-anim {
+  0% { transform: translate(0, 0) rotate(0deg) scale(1); }
+  50% { transform: translate(calc(var(--wind-x, 2px) * 1), calc(var(--wind-y, 1px) * 1)) rotate(5deg) scale(1.02); }
+  100% { transform: translate(calc(var(--wind-x, 2px) * -1), calc(var(--wind-y, 1px) * -1)) rotate(-3deg) scale(0.98); }
+}
+
 /* ── Ground Leaf (on ground, curled) ── */
 .ground-leaf {
   animation: ground-leaf-settle 4s ease-in-out infinite alternate;

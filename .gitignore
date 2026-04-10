@@ -20,8 +20,11 @@ frontend/coverage/
 backend/__pycache__/
 backend/venv/
 backend/.env
+backend/.env.*
 backend/.venv/
 backend/env/
+.env
+.env.*
 backend/*.pyc
 backend/*.pyo
 backend/*.pyd

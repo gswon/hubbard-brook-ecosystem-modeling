@@ -246,7 +246,7 @@ export default function WeatherVisualizer() {
             <div className="absolute inset-0 z-20 flex items-end justify-end p-6 md:p-10 pointer-events-none">
 
                 {/* Right side container for all UI elements - Compact and Bottom-Right aligned */}
-                <div className="w-full max-w-[32rem] flex flex-col gap-4 pointer-events-auto">
+                <div className="w-full max-w-[38rem] flex flex-col gap-4 pointer-events-auto">
 
                     {/* Alerts Stack (Removed) */}
 
@@ -261,7 +261,7 @@ export default function WeatherVisualizer() {
                                 <h1 className="text-3xl tracking-widest font-extralight text-slate-100 flex items-center gap-3">
                                     hubbard brook <span className="font-bold tracking-normal opacity-90">viz</span>
                                 </h1>
-                                <p className="text-[10px] tracking-[0.2em] text-slate-400 mt-1 uppercase">Forest Ecosystem Monitor</p>
+                                <p className="text-[10px] tracking-[0.2em] text-white/40 mt-1 uppercase">Forest Ecosystem Monitor</p>
                             </div>
                             <div className="flex flex-col items-end gap-2 text-xs">
                                 <button onClick={handleLiveToggle} className={`flex items-center gap-2 px-4 py-1.5 rounded-full border transition-all ${isLive ? "bg-emerald-500/20 border-emerald-500/50 text-emerald-300" : "bg-white/5 border-white/10 text-slate-300 hover:bg-white/10"}`}>
@@ -286,7 +286,7 @@ export default function WeatherVisualizer() {
                             {!isLive ? (
                                 <>
                                     <div className="relative">
-                                        <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400 pointer-events-none" />
+                                        <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-white pointer-events-none" />
                                         <input
                                             type="date"
                                             value={currentDate}
@@ -312,7 +312,7 @@ export default function WeatherVisualizer() {
                         {/* Playback Controls & Timeline */}
                         {!isLive && (
                             <div className="flex flex-col gap-3 mb-8 w-full">
-                                <div className="flex items-center justify-between text-[10px] font-medium text-slate-400 font-mono">
+                                <div className="flex items-center justify-between text-[10px] font-medium text-white/40 font-mono">
                                     <button
                                         onClick={() => setIsPlaying(!isPlaying)}
                                         className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-white/10 hover:bg-white/20 transition-all text-white border border-white/10 cursor-pointer"
@@ -337,7 +337,7 @@ export default function WeatherVisualizer() {
                         )}
 
                         {/* Environment Metrics Grid */}
-                        <div className="grid grid-cols-4 md:grid-cols-8 gap-2 pt-6 border-t border-white/10 relative">
+                        <div className="grid grid-cols-4 md:grid-cols-8 gap-2 md:gap-3 pt-6 border-t border-white/10 relative px-1">
                             {isLive && (
                                 <button
                                     onClick={fetchLive}

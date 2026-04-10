@@ -251,7 +251,7 @@ function getSeasonInfo(date: string, airtemp: number, stream: number): SeasonInf
 // ═══════════════════════════════════════════════════════════════════
 
 type Branch = { x1: number; y1: number; x2: number; y2: number; thickness: number; depth: number };
-type TreeLeaf = { cx: number; cy: number; r: number; opacity: number; isBlossom: boolean; angle: number; dropThreshold: number };
+type TreeLeaf = { cx: number; cy: number; r: number; opacity: number; isBlossom: boolean; angle: number; dropThreshold: number; branchDepth: number };
 
 function buildTree(): { branches: Branch[]; leaves: TreeLeaf[] } {
     const branches: Branch[] = [];
@@ -275,7 +275,8 @@ function buildTree(): { branches: Branch[]; leaves: TreeLeaf[] } {
                     opacity: 0.85 + Math.random() * 0.15, // more opaque
                     isBlossom: Math.random() > 0.8,
                     angle: Math.random() * 360,
-                    dropThreshold: Math.random() // for random even shedding
+                    dropThreshold: Math.random(), // slight random jitter within depth
+                    branchDepth: depth
                 });
             }
         }
@@ -517,7 +518,7 @@ export default function TreeVisualizer({ airtemp, windspeed, stream, snowDepth, 
     // No more slicing which drops chunks at a time.
     // We will conditionally render leaves based on their internal dropThreshold.
 
-    const swayDeg = Math.min(windspeed * 1.8, 18);
+    const swayDeg = windspeed < 0.5 ? 0 : Math.min(windspeed * 1.8, 18);
     const swayDuration = Math.max(0.8, 4 - windspeed * 0.2);
     const rainDroop = stream > 0.1 ? Math.min(stream * 20, 6) : 0;
     const trunkColor = seasonInfo.baseSeason === "winter" ? "#1f140e" : "#2a1c12";
@@ -649,87 +650,35 @@ export default function TreeVisualizer({ airtemp, windspeed, stream, snowDepth, 
                     <path d="M-250,405 Q200,300 650,405 Z" fill="rgba(0,0,0,0.4)" style={{ filter: 'blur(12px)' }} />
                 </motion.g>
 
-                {/* Ground elements */}
-                {snowDepth < 5 && groundElements.map((g, i) => {
-                    if (g.type === "flower" && g.petalCount) {
-                        return <SvgFlowerShape key={`g${i}`} cx={g.x} cy={g.y}
-                            size={g.h} color={g.color} petalCount={g.petalCount} delay={g.delay} />;
-                    }
-                    if (g.type === "leaf") {
-                        return <SvgLeafShape key={`g${i}`} cx={g.x} cy={g.y}
-                            r={g.h * 1.2} fill={g.color} opacity={g.opacity}
-                            angle={g.angle} className="ground-leaf" />;
-                    }
-                    return (
-                        <path key={`g${i}`}
-                            d={`M${g.x},${g.y} Q${g.x + g.bend},${g.y - g.h * 0.6} ${g.x + g.bend * 1.8},${g.y - g.h}`}
-                            stroke={g.color} strokeWidth={g.width} fill="none" strokeLinecap="round"
-                            opacity={g.opacity} />
-                    );
-                })}
-
-                {/* Majestic Snow cap */}
-                {snowDepth > 5 && (
-                    <>
-                        <motion.path d="M-850,400 Q150,150 1150,400 L1150,1200 L-850,1200 Z"
-                            fill="#f1f5f9" opacity={Math.min(snowDepth / 50, 1)}
-                            initial={{ opacity: 0 }} animate={{ opacity: Math.min(snowDepth / 50, 1) }} />
-                        {snowDepth > 15 && Array.from({ length: 14 }).map((_, i) => {
-                            const st = (i / 13);
-                            const sx = -300 + st * 900;
-                            const t = (sx + 850) / 2000;
-                            const sy = (1 - t) ** 2 * 400 + 2 * (1 - t) * t * 155 + t ** 2 * 400;
-                            return <circle key={`sp${i}`} cx={sx} cy={sy + 5 + Math.random() * 20}
-                                r={1 + Math.random() * 1.5} fill="white" className="snow-sparkle"
-                                style={{ animationDelay: `${i * 0.4}s` }} />;
-                        })}
-                    </>
-                )}
-
                 {/* Tree shadow */}
                 <ellipse cx="200" cy="277" rx={55 + windspeed * 0.8} ry="7" fill="url(#shadowGrad)" />
 
-                {/* Tree structure */}
+                {/* Trunk base — fixed wide ellipse (not swaying) planted on the ground */}
+                <ellipse cx="200" cy="278" rx={15} ry="5" fill={trunkColor} opacity={0.9} />
+
+                {/* Tree structure - anchored exactly at root coordinates */}
                 <motion.g
                     style={{ originX: "200px", originY: "280px" }}
                     animate={{
-                        rotate: [0, swayDeg, 0, -swayDeg * 0.6, 0],
-                        skewX: [0, swayDeg * 0.05, 0, -swayDeg * 0.03, 0],
-                        skewY: [0, rainDroop * 0.1, 0],
+                        rotate: swayDeg,
+                        skewX: swayDeg * 0.1,
+                        skewY: rainDroop * 0.1,
                     }}
-                    transition={{ repeat: Infinity, duration: swayDuration, ease: "easeInOut" }}
+                    transition={{ type: "spring", stiffness: 50, damping: 20 }}
                 >
-                    {/* Trunk base — wide ellipse to blend into ground smoothly */}
-                    <ellipse cx="200" cy="278" rx={branches[0]?.thickness * 0.9 || 16} ry="5"
-                        fill={trunkColor} opacity={0.9} />
-
                     {branches.map((b, i) => {
-                        // Compute a tapered branch as a filled polygon:
-                        // Two points at the base (half-width apart perpendicular to branch angle)
-                        // and two points at the tip (much thinner)
-                        const dx = b.x2 - b.x1;
-                        const dy = b.y2 - b.y1;
-                        const len = Math.sqrt(dx * dx + dy * dy) || 1;
-                        // Perpendicular unit vector
-                        const nx = -dy / len;
-                        const ny = dx / len;
-                        const baseW = b.thickness * 0.55;
-                        const tipW = b.thickness * 0.10;
-                        // Four corners of the tapered shape
-                        const x1a = b.x1 + nx * baseW, y1a = b.y1 + ny * baseW;
-                        const x1b = b.x1 - nx * baseW, y1b = b.y1 - ny * baseW;
-                        const x2a = b.x2 + nx * tipW,  y2a = b.y2 + ny * tipW;
-                        const x2b = b.x2 - nx * tipW,  y2b = b.y2 - ny * tipW;
                         // Darken slightly for depth on finer branches
                         const colorShift = Math.max(0, (7 - b.depth) * 8);
-                        const r = parseInt(trunkColor.slice(1,3), 16);
-                        const g = parseInt(trunkColor.slice(3,5), 16);
-                        const bC = parseInt(trunkColor.slice(5,7), 16);
-                        const branchColor = `rgb(${Math.min(255,r+colorShift)},${Math.min(255,g+colorShift)},${Math.min(255,bC+colorShift)})`;
+                        const r = parseInt(trunkColor.slice(1, 3), 16);
+                        const g = parseInt(trunkColor.slice(3, 5), 16);
+                        const bC = parseInt(trunkColor.slice(5, 7), 16);
+                        const branchColor = `rgb(${Math.min(255, r + colorShift)},${Math.min(255, g + colorShift)},${Math.min(255, bC + colorShift)})`;
                         return (
-                            <path key={i}
-                                d={`M${x1a},${y1a} L${x2a},${y2a} L${x2b},${y2b} L${x1b},${y1b} Z`}
-                                fill={branchColor}
+                            <line key={i}
+                                x1={b.x1} y1={b.y1} x2={b.x2} y2={b.y2}
+                                stroke={branchColor}
+                                strokeWidth={b.thickness}
+                                strokeLinecap="round"
                             />
                         );
                     })}
@@ -746,8 +695,19 @@ export default function TreeVisualizer({ airtemp, windspeed, stream, snowDepth, 
                                 style={{ filter: "drop-shadow(0 15px 25px rgba(0,0,0,0.4))" }}
                             >
                                 {leaves.map((leaf, i) => {
-                                    // Skip rendering this individual leaf if density is below its threshold
-                                    if (seasonInfo.foliageDensity < leaf.dropThreshold) return null;
+                                    // ── Depth-based seasoning logic ──
+                                    // depth 1 = outer edge (tips)
+                                    // depth 3 = inner branches
+                                    // Edge-first growth: tips appear at low density, inner leaves appear later.
+                                    // Edge-last shedding: density drops, inner leaves fall first, tips remain.
+                                    
+                                    // Base threshold for this leaf's depth (1 -> 0, 3 -> 0.7)
+                                    const depthBase = (leaf.branchDepth - 1) * 0.35;
+                                    // Add unique jitter so they don't pop in/out in batches
+                                    const visibilityThreshold = Math.min(0.95, depthBase + (leaf.dropThreshold * 0.3));
+                                    
+                                    if (seasonInfo.foliageDensity < visibilityThreshold) return null;
+                                    
                                     const color = seasonInfo.leafColors.length > 0
                                         ? seasonInfo.leafColors[i % seasonInfo.leafColors.length]
                                         : "#15803d";
@@ -785,6 +745,44 @@ export default function TreeVisualizer({ airtemp, windspeed, stream, snowDepth, 
                         )}
                     </AnimatePresence>
                 </motion.g>
+                {/* Ground elements */}
+                {snowDepth < 5 && groundElements.map((g, i) => {
+                    if (g.type === "flower" && g.petalCount) {
+                        return <SvgFlowerShape key={`g${i}`} cx={g.x} cy={g.y}
+                            size={g.h} color={g.color} petalCount={g.petalCount} delay={g.delay} />;
+                    }
+                    if (g.type === "leaf") {
+                        return <SvgLeafShape key={`g${i}`} cx={g.x} cy={g.y}
+                            r={g.h * 1.2} fill={g.color} opacity={g.opacity}
+                            angle={g.angle} className="ground-leaf" />;
+                    }
+                    return (
+                        <path key={`g${i}`}
+                            d={`M${g.x},${g.y} Q${g.x + g.bend},${g.y - g.h * 0.6} ${g.x + g.bend * 1.8},${g.y - g.h}`}
+                            stroke={g.color} strokeWidth={g.width} fill="none" strokeLinecap="round"
+                            opacity={g.opacity} />
+                    );
+                })}
+
+                {/* Majestic Snow cap */}
+                {snowDepth > 5 && (
+                    <>
+                        <motion.path d="M-850,400 Q150,150 1150,400 L1150,1200 L-850,1200 Z"
+                            fill="#f1f5f9" opacity={Math.min(snowDepth / 50, 1)}
+                            initial={{ opacity: 0 }} animate={{ opacity: Math.min(snowDepth / 50, 1) }} />
+                        {snowDepth > 15 && Array.from({ length: 14 }).map((_, i) => {
+                            const st = (i / 13);
+                            const sx = -300 + st * 900;
+                            const t = (sx + 850) / 2000;
+                            const sy = (1 - t) ** 2 * 400 + 2 * (1 - t) * t * 155 + t ** 2 * 400;
+                            return <circle key={`sp${i}`} cx={sx} cy={sy + 5 + Math.random() * 20}
+                                r={1 + Math.random() * 1.5} fill="white" className="snow-sparkle"
+                                style={{ animationDelay: `${i * 0.4}s` }} />;
+                        })}
+                    </>
+                )}
+
+
             </svg>
         </div>
     );
