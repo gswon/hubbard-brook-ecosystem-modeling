@@ -8,6 +8,11 @@ import io
 import os
 from datetime import datetime, timezone
 import logging
+from dotenv import load_dotenv
+from langchain_groq import ChatGroq
+from langchain_core.prompts import PromptTemplate
+
+load_dotenv()
 
 logger = logging.getLogger("uvicorn.error")
 
@@ -279,6 +284,50 @@ def get_date_range():
         "source": data_source,
         "fetched": last_fetched,
     }
+
+
+@app.get("/weather-narration")
+async def get_weather_narration(date: str = "2024-01-01", hour: int = 0):
+    """Generate a natural language description of the weather using LLM."""
+    try:
+        row = _get_row(date, hour)
+        data_dict = _row_to_dict(row)
+        
+        api_key = os.getenv("GROQ_API_KEY")
+        if not api_key:
+            return {"narration": "AI Narration is unavailable. Please set GROQ_API_KEY in the backend .env file."}
+
+        llm = ChatGroq(model="llama-3.3-70b-versatile", temperature=0.7, groq_api_key=api_key)
+        prompt = PromptTemplate.from_template(
+            "You are a professional meteorological forecaster for Hubbard Brook. "
+            "Based on the following data for {date} at {hour}:00: "
+            "Temp: {airtemp}°C, Wind: {windspeed}m/s, Precip: {precip}mm, Solar: {solar}W, Humidity: {rh}%, Snow: {snow}mm. "
+            "Provide a concise, human-like weather report in 3-4 professional sentences. "
+            "CRITICAL: Each sentence must be 10 words or less. "
+            "Use objective, data-driven wording typical of a news weather forecast. "
+            "AVOID dramatic, poetic, or flowery language."
+        )
+        
+        chain = prompt | llm
+        # Filter data_dict to pass only relevant metrics to the prompt
+        input_data = {
+            "date": date,
+            "hour": hour,
+            "airtemp": data_dict.get("airtemp", 0),
+            "windspeed": data_dict.get("windspeed", 0),
+            "precip": data_dict.get("precip", 0),
+            "solar": data_dict.get("solar", 0),
+            "rh": data_dict.get("rh", 0),
+            "snow": data_dict.get("snow", 0)
+        }
+        
+        response = await chain.ainvoke(input_data)
+        return {"narration": response.content}
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"AI Narration failed: {e}")
+        return {"narration": "The forest maintains its quiet mystery as the AI analysis encountered an error."}
 
 
 @app.get("/force-refresh")
