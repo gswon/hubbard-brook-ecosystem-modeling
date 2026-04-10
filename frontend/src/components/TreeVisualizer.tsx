@@ -251,7 +251,7 @@ function getSeasonInfo(date: string, airtemp: number, stream: number): SeasonInf
 // ═══════════════════════════════════════════════════════════════════
 
 type Branch = { x1: number; y1: number; x2: number; y2: number; thickness: number; depth: number };
-type TreeLeaf = { cx: number; cy: number; r: number; opacity: number; isBlossom: boolean; angle: number; dropThreshold: number };
+type TreeLeaf = { cx: number; cy: number; r: number; opacity: number; isBlossom: boolean; angle: number; dropThreshold: number; branchDepth: number };
 
 function buildTree(): { branches: Branch[]; leaves: TreeLeaf[] } {
     const branches: Branch[] = [];
@@ -275,7 +275,8 @@ function buildTree(): { branches: Branch[]; leaves: TreeLeaf[] } {
                     opacity: 0.85 + Math.random() * 0.15, // more opaque
                     isBlossom: Math.random() > 0.8,
                     angle: Math.random() * 360,
-                    dropThreshold: Math.random() // for random even shedding
+                    dropThreshold: Math.random(), // slight random jitter within depth
+                    branchDepth: depth
                 });
             }
         }
@@ -517,7 +518,7 @@ export default function TreeVisualizer({ airtemp, windspeed, stream, snowDepth, 
     // No more slicing which drops chunks at a time.
     // We will conditionally render leaves based on their internal dropThreshold.
 
-    const swayDeg = Math.min(windspeed * 1.8, 18);
+    const swayDeg = windspeed < 0.5 ? 0 : Math.min(windspeed * 1.8, 18);
     const swayDuration = Math.max(0.8, 4 - windspeed * 0.2);
     const rainDroop = stream > 0.1 ? Math.min(stream * 20, 6) : 0;
     const trunkColor = seasonInfo.baseSeason === "winter" ? "#1f140e" : "#2a1c12";
@@ -659,11 +660,11 @@ export default function TreeVisualizer({ airtemp, windspeed, stream, snowDepth, 
                 <motion.g
                     style={{ originX: "200px", originY: "280px" }}
                     animate={{
-                        rotate: [0, swayDeg, 0, -swayDeg * 0.6, 0],
-                        skewX: [0, swayDeg * 0.05, 0, -swayDeg * 0.03, 0],
-                        skewY: [0, rainDroop * 0.1, 0],
+                        rotate: swayDeg,
+                        skewX: swayDeg * 0.1,
+                        skewY: rainDroop * 0.1,
                     }}
-                    transition={{ repeat: Infinity, duration: swayDuration, ease: "easeInOut" }}
+                    transition={{ type: "spring", stiffness: 50, damping: 20 }}
                 >
                     {branches.map((b, i) => {
                         // Darken slightly for depth on finer branches
@@ -694,8 +695,19 @@ export default function TreeVisualizer({ airtemp, windspeed, stream, snowDepth, 
                                 style={{ filter: "drop-shadow(0 15px 25px rgba(0,0,0,0.4))" }}
                             >
                                 {leaves.map((leaf, i) => {
-                                    // Skip rendering this individual leaf if density is below its threshold
-                                    if (seasonInfo.foliageDensity < leaf.dropThreshold) return null;
+                                    // ── Depth-based seasoning logic ──
+                                    // depth 1 = outer edge (tips)
+                                    // depth 3 = inner branches
+                                    // Edge-first growth: tips appear at low density, inner leaves appear later.
+                                    // Edge-last shedding: density drops, inner leaves fall first, tips remain.
+                                    
+                                    // Base threshold for this leaf's depth (1 -> 0, 3 -> 0.7)
+                                    const depthBase = (leaf.branchDepth - 1) * 0.35;
+                                    // Add unique jitter so they don't pop in/out in batches
+                                    const visibilityThreshold = Math.min(0.95, depthBase + (leaf.dropThreshold * 0.3));
+                                    
+                                    if (seasonInfo.foliageDensity < visibilityThreshold) return null;
+                                    
                                     const color = seasonInfo.leafColors.length > 0
                                         ? seasonInfo.leafColors[i % seasonInfo.leafColors.length]
                                         : "#15803d";
