@@ -91,15 +91,31 @@ function useSnowFlakes(precip: number, airtemp: number, snowDepth: number) {
 // ─── Wind streaks ──────────────────────────────────────────────────
 function useWindStreaks(windspeed: number) {
     return useMemo(() => {
-        if (windspeed < 2) return [];
-        const count = clamp(Math.floor(windspeed * 3), 4, 40);
+        if (windspeed < 1.5) return []; // Lower threshold
+        const count = clamp(Math.floor(windspeed * 5), 8, 80); // More streaks
         return Array.from({ length: count }).map((_, i) => ({
             id: i,
-            top: 5 + Math.random() * 75,
-            len: 40 + Math.random() * 120,
-            delay: Math.random() * 4,
-            speed: clamp(1.5 - windspeed * 0.08, 0.2, 1.4) + Math.random() * 0.3,
-            opacity: 0.08 + Math.random() * 0.15,
+            top: 2 + Math.random() * 95,
+            len: 60 + Math.random() * 180, // Longer
+            delay: Math.random() * 5,
+            speed: clamp(1.2 - windspeed * 0.1, 0.15, 1.2) + Math.random() * 0.2, // Faster
+            opacity: 0.12 + Math.random() * 0.2, // Brighter
+        }));
+    }, [Math.round(windspeed)]);
+}
+
+// ─── Wind Flow Curves (Wind UI) ──────────────────────────────────────
+function useWindFlow(windspeed: number) {
+    return useMemo(() => {
+        if (windspeed < 3.5) return [];
+        const count = clamp(Math.floor(windspeed * 0.8), 2, 12);
+        return Array.from({ length: count }).map((_, i) => ({
+            id: i,
+            top: 15 + Math.random() * 70,
+            delay: Math.random() * 6,
+            speed: clamp(2.5 - windspeed * 0.12, 0.6, 2.5) + Math.random() * 0.5,
+            opacity: 0.1 + (windspeed / 20) * 0.4,
+            width: 150 + Math.random() * 200,
         }));
     }, [Math.round(windspeed)]);
 }
@@ -118,6 +134,7 @@ export default function WeatherEffects({ precip, solar, rh, airtemp, snowDepth, 
     const rainDrops  = useRainDrops(isRaining ? precip : 0, windspeed);
     const snowFlakes = useSnowFlakes(precip, airtemp, snowDepth);
     const windStreaks = useWindStreaks(windspeed);
+    const windFlow = useWindFlow(windspeed);
 
     // Celestial body
     const isDay = solar > 20 || (hour >= 6 && hour < 18);
@@ -244,6 +261,27 @@ export default function WeatherEffects({ precip, solar, rh, airtemp, snowDepth, 
                     animate={{ x: ["-15vw", "130vw"], opacity: [0, w.opacity, 0] }}
                     transition={{ repeat: Infinity, duration: w.speed, delay: w.delay, ease: "linear" }}
                 />
+            ))}
+
+            {/* ── Wind Flow (Curved UI paths) ─────────────────────── */}
+            {windFlow.map(wf => (
+                <motion.div
+                    key={`wf-${wf.id}`}
+                    className="absolute pointer-events-none overflow-visible"
+                    style={{ top: `${wf.top}vh`, left: "-20vw", width: wf.width, height: 100 }}
+                    animate={{ x: ["-20vw", "130vw"], opacity: [0, wf.opacity, wf.opacity, 0] }}
+                    transition={{ repeat: Infinity, duration: wf.speed, delay: wf.delay, ease: "linear" }}
+                >
+                    <svg viewBox="0 0 300 100" fill="none" className="w-full h-full">
+                        <path 
+                            d="M0,50 Q75,20 150,50 T300,50" 
+                            stroke="white" 
+                            strokeWidth="1.5" 
+                            strokeOpacity={0.6}
+                            strokeDasharray="10 20"
+                        />
+                    </svg>
+                </motion.div>
             ))}
 
             {/* ── Vortex / dust devil (extreme wind) ───────────────── */}
