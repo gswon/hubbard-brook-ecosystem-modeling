@@ -249,7 +249,6 @@ body {
 /* ── Leaf Sway — CSS version for higher performance ── */
 .leaf-sway {
   transform-origin: center center;
-  animation: leaf-sway-anim var(--leaf-duration, 3s) ease-in-out infinite alternate;
   will-change: transform;
 }
 

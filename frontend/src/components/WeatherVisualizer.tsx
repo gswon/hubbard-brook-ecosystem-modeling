@@ -4,7 +4,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import TreeVisualizer from "./TreeVisualizer";
 import WeatherEffects from "./WeatherEffects";
-import { Loader2, Play, Pause, Calendar, Radio, RefreshCw, Wind, Thermometer, Droplets, Sun } from "lucide-react";
+import { Loader2, Play, Pause, Calendar, Radio, RefreshCw, Wind, Thermometer, Droplets, Sun, Volume2, VolumeX } from "lucide-react";
 
 // Column aliases returned by the new backend
 interface WeatherData {
@@ -91,17 +91,22 @@ function DetailModal({
 
     // Memoize points to handle data updates without flickering
     const points = useMemo(() => {
+        if (!values || values.length === 0) return [];
+        // Prevent div by zero if only 1 value exists
+        const length = values.length > 1 ? values.length - 1 : 1;
         return values.map((v, i) => {
-            const x = padding + (i / (values.length - 1)) * innerW;
+            const x = padding + (i / length) * innerW;
             const y = padding + innerH - ((v - min) / range) * innerH;
             return { x, y, val: v };
         });
     }, [values, min, max, range, innerW, innerH]);
 
+    if (points.length === 0) return null;
+
     const path = `M${points[0].x},${points[0].y} ` + points.slice(1).map(p => `L${p.x},${p.y}`).join(" ");
     const areaPath = `${path} L${points[points.length - 1].x},${chartHeight - padding} L${points[0].x},${chartHeight - padding} Z`;
 
-    const activePoint = activeIndex !== null ? points[activeIndex] : null;
+    const activePoint = activeIndex !== null && activeIndex < points.length ? points[activeIndex] : null;
 
     return (
         <motion.div
@@ -253,6 +258,96 @@ export default function WeatherVisualizer() {
     const [isPlaying, setIsPlaying] = useState(false);
     const [isNarrationOpen, setIsNarrationOpen] = useState(false);
     const playIntervalRef = useRef<NodeJS.Timeout | null>(null);
+
+    // Toast state
+    const [toastMsg, setToastMsg] = useState<string | null>(null);
+    const toastTimerRef = useRef<NodeJS.Timeout | null>(null);
+    const showToast = useCallback((msg: string) => {
+        setToastMsg(msg);
+        if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
+        toastTimerRef.current = setTimeout(() => setToastMsg(null), 3500);
+    }, []);
+
+    // Audio State
+    const [soundEnabled, setSoundEnabled] = useState(false);
+    const rainAudioRef = useRef<HTMLAudioElement | null>(null);
+    const windAudioRef = useRef<HTMLAudioElement | null>(null);
+    const leavesAudioRef = useRef<HTMLAudioElement | null>(null);
+    const snowAudioRef = useRef<HTMLAudioElement | null>(null);
+
+    useEffect(() => {
+        if (typeof window !== "undefined") {
+            rainAudioRef.current = new Audio("https://actions.google.com/sounds/v1/weather/rain_heavy_loud.ogg");
+            rainAudioRef.current.loop = true;
+            rainAudioRef.current.volume = 0.5;
+
+            windAudioRef.current = new Audio("https://actions.google.com/sounds/v1/weather/wind_blowing_through_trees.ogg");
+            windAudioRef.current.loop = true;
+            windAudioRef.current.volume = 0.5;
+            
+            leavesAudioRef.current = new Audio("https://actions.google.com/sounds/v1/weather/strong_wind.ogg");
+            leavesAudioRef.current.loop = true;
+            leavesAudioRef.current.volume = 0.5;
+
+            snowAudioRef.current = new Audio("https://actions.google.com/sounds/v1/weather/wind.ogg");
+            snowAudioRef.current.loop = true;
+            snowAudioRef.current.volume = 0.5;
+        }
+        return () => {
+            rainAudioRef.current?.pause();
+            windAudioRef.current?.pause();
+            leavesAudioRef.current?.pause();
+            snowAudioRef.current?.pause();
+        };
+    }, []);
+
+    useEffect(() => {
+        if (!rainAudioRef.current || !windAudioRef.current || !leavesAudioRef.current || !snowAudioRef.current) return;
+
+        if (!soundEnabled || !data) {
+            rainAudioRef.current.pause();
+            windAudioRef.current.pause();
+            leavesAudioRef.current.pause();
+            snowAudioRef.current.pause();
+            return;
+        }
+
+        const isSnowing = data.precip > 0.0 && (data.airtemp < 2 || data.snow > 0.0);
+        const isRaining = data.precip > 0.0 && data.airtemp >= 2 && data.snow <= 0.0;
+
+        // Play rain sound only when it's raining (not snowing)
+        if (isRaining) {
+            rainAudioRef.current.volume = Math.min(1.0, 0.2 + (data.precip * 0.1));
+            rainAudioRef.current.play().catch(() => {});
+        } else {
+            rainAudioRef.current.pause();
+        }
+
+        if (data.windspeed > 2.0) {
+            windAudioRef.current.volume = Math.min(1.0, 0.2 + (data.windspeed - 2) * 0.1);
+            windAudioRef.current.play().catch(() => {});
+        } else {
+            windAudioRef.current.pause();
+        }
+        // Play snow sound when it's snowing
+        if (isSnowing) {
+            // Boost snow (cold wind) volume significantly to stand out like rain
+            snowAudioRef.current.volume = Math.min(1.0, 0.6 + (data.precip * 0.4));
+            snowAudioRef.current.play().catch(() => {});
+        } else {
+            snowAudioRef.current.pause();
+        }
+
+        // Play falling leaves sound in autumn (Sept, Oct, Nov) when wind is blowing
+        const month = parseInt(data.date.split("-")[1] || "1");
+        const isAutumn = month >= 9 && month <= 11;
+        if (isAutumn && data.windspeed > 1.0) {
+            leavesAudioRef.current.volume = Math.min(1.0, 0.1 + (data.windspeed * 0.1));
+            leavesAudioRef.current.play().catch(() => {});
+        } else {
+            leavesAudioRef.current.pause();
+        }
+    }, [data, soundEnabled]);
 
     // Live mode
     const [isLive, setIsLive] = useState(false);
@@ -522,31 +617,41 @@ export default function WeatherVisualizer() {
                                 <p className="text-[10px] tracking-[0.2em] text-white/40 mt-1 uppercase">Forest Ecosystem Monitor</p>
                             </div>
                             <div className="flex flex-col items-end gap-2 text-xs">
-                                <div className="flex gap-2">
+                                <div className="flex gap-2 items-center">
+                                    {/* Icon-only Sound Button to save space */}
+                                    <button
+                                        onClick={() => setSoundEnabled(v => !v)}
+                                        className={`flex items-center justify-center w-8 h-8 rounded-full border transition-all ${soundEnabled ? "bg-teal-500/20 border-teal-500/50 text-teal-300" : "bg-white/5 border-white/10 text-slate-300 hover:bg-white/10"}`}
+                                        title={soundEnabled ? "Sound On" : "Sound Off"}
+                                    >
+                                        {soundEnabled ? <Volume2 className="w-3.5 h-3.5" /> : <VolumeX className="w-3.5 h-3.5 opacity-50" />}
+                                    </button>
+                                    
                                     <button 
                                         onClick={() => {
                                             const next = !isNarrationOpen;
                                             setIsNarrationOpen(next);
                                             if (next) setIsPlaying(false); // Pause if opening observer
                                         }} 
-                                        className={`flex items-center gap-2 px-4 py-1.5 rounded-full border transition-all ${isNarrationOpen ? "bg-teal-500/20 border-teal-500/50 text-teal-300" : "bg-white/5 border-white/10 text-slate-300 hover:bg-white/10"}`}
+                                        className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full border transition-all ${isNarrationOpen ? "bg-teal-500/20 border-teal-500/50 text-teal-300" : "bg-white/5 border-white/10 text-slate-300 hover:bg-white/10"}`}
                                         title="AI Narration"
                                     >
                                         <Radio className={`w-3.5 h-3.5 ${isNarrationOpen ? 'animate-pulse' : ''}`} />
-                                        <span className="font-medium tracking-wider">{isNarrationOpen ? "HIDE AI" : "AI OBSERVER"}</span>
+                                        <span className="font-bold tracking-wider text-[10px] sm:text-xs">{isNarrationOpen ? "HIDE AI" : "AI"}</span>
                                     </button>
-                                    <button onClick={handleLiveToggle} className={`flex items-center gap-2 px-4 py-1.5 rounded-full border transition-all ${isLive ? "bg-emerald-500/20 border-emerald-500/50 text-emerald-300" : "bg-white/5 border-white/10 text-slate-300 hover:bg-white/10"}`}>
+                                    
+                                    <button onClick={handleLiveToggle} className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full border transition-all ${isLive ? "bg-emerald-500/20 border-emerald-500/50 text-emerald-300" : "bg-white/5 border-white/10 text-slate-300 hover:bg-white/10"}`}>
                                         {isLive && (
                                             <span className="relative flex h-2 w-2">
                                                 <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
                                                 <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
                                             </span>
                                         )}
-                                        <span className="font-medium tracking-wider">{isLive ? "LIVE" : "GO LIVE"}</span>
+                                        <span className="font-bold tracking-wider text-[10px] sm:text-xs">LIVE</span>
                                     </button>
                                 </div>
                                 {isLive && lastLiveUpdate && (
-                                    <span className="text-[10px] text-white/40 uppercase font-mono tracking-wider">
+                                    <span className="text-[10px] text-white/40 uppercase font-mono tracking-wider mt-1">
                                         Upd: {lastLiveUpdate.toLocaleTimeString()}
                                     </span>
                                 )}
@@ -554,25 +659,57 @@ export default function WeatherVisualizer() {
                         </div>
 
                         {/* Date Picker & Time Indicator */}
-                        <div className="w-full flex justify-between items-center mb-4 px-1">
+                        <div className="w-full flex justify-between items-center mb-4 px-1 relative">
                             {!isLive ? (
                                 <>
-                                    <div className="relative">
-                                        <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-white pointer-events-none" />
-                                        <input
-                                            type="date"
-                                            value={currentDate}
-                                            min={dateRange.start}
-                                            max={dateRange.end}
-                                            onChange={(e) => {
-                                                setCurrentDate(e.target.value || dateRange.start);
-                                                setIsPlaying(false);
-                                            }}
-                                            className="bg-white/5 hover:bg-white/10 transition-colors pl-9 pr-3 py-1.5 text-xs text-slate-200 rounded-lg border border-white/10 focus:outline-none focus:ring-1 focus:ring-teal-500/50"
-                                            style={{ colorScheme: "dark" }}
-                                        />
+                                    <div className="flex items-center gap-3">
+                                        <div className="relative z-10">
+                                            <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-white pointer-events-none" />
+                                            <input
+                                                type="date"
+                                                value={currentDate}
+                                                min={dateRange.start}
+                                                max={dateRange.end}
+                                                onChange={(e) => {
+                                                    const val = e.target.value;
+                                                    if (!val) {
+                                                        setCurrentDate(dateRange.start);
+                                                        setIsPlaying(false);
+                                                        return;
+                                                    }
+                                                    
+                                                    if (val > dateRange.end) {
+                                                        showToast(`No data available after ${dateRange.end}`);
+                                                    } else if (val < dateRange.start) {
+                                                        showToast(`No data available before ${dateRange.start}`);
+                                                    }
+                                                    
+                                                    setCurrentDate(val);
+                                                    setIsPlaying(false);
+                                                }}
+                                                className="bg-white/5 hover:bg-white/10 transition-colors pl-9 pr-3 py-1.5 text-xs text-slate-200 rounded-lg border border-white/10 focus:outline-none focus:ring-1 focus:ring-teal-500/50"
+                                                style={{ colorScheme: "dark" }}
+                                            />
+                                        </div>
+                                        <AnimatePresence>
+                                            {toastMsg && (
+                                                <motion.div
+                                                    initial={{ opacity: 0, x: -10, scale: 0.95 }}
+                                                    animate={{ opacity: 1, x: 0, scale: 1 }}
+                                                    exit={{ opacity: 0, x: -10, scale: 0.95 }}
+                                                    className="px-3 py-1.5 rounded-full text-[10px] sm:text-xs font-bold text-red-300 z-50 whitespace-nowrap shadow-md"
+                                                    style={{
+                                                        background: "rgba(220, 38, 38, 0.2)",
+                                                        border: "1px solid rgba(220, 38, 38, 0.3)",
+                                                        backdropFilter: "blur(12px)"
+                                                    }}
+                                                >
+                                                    ⚠️ {toastMsg}
+                                                </motion.div>
+                                            )}
+                                        </AnimatePresence>
                                     </div>
-                                    <div className="text-lg font-bold font-mono tracking-tight text-white drop-shadow-md">
+                                    <div className="relative z-10 text-lg font-bold font-mono tracking-tight text-white drop-shadow-md">
                                         {currentHour.toString().padStart(2, "0")}:00
                                     </div>
                                 </>
