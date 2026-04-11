@@ -38,7 +38,7 @@ interface WeatherSummary {
     chill: WeatherMetric[];
 }
 
-const API = "http://127.0.0.1:8000";
+const API = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000";
 const LIVE_POLL_MS = 60 * 60 * 1000; // 1 hour
 
 interface DateRange {
