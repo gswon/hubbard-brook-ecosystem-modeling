@@ -38,7 +38,7 @@ interface WeatherSummary {
     chill: WeatherMetric[];
 }
 
-const API = ""; // Use relative paths for Vercel integrated deployment
+const API = "/api"; // Integrated Vercel Function path
 const LIVE_POLL_MS = 60 * 60 * 1000; // 1 hour
 
 interface DateRange {

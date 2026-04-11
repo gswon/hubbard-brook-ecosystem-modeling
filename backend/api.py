@@ -16,7 +16,7 @@ load_dotenv()
 
 logger = logging.getLogger("uvicorn.error")
 
-app = FastAPI(title="Hubbard Brook Weather Analysis API")
+app = FastAPI(title="Hubbard Brook Weather Analysis API", root_path="/api")
 
 app.add_middleware(
     CORSMiddleware,
