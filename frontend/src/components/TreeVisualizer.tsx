@@ -280,7 +280,7 @@ function buildTree(): { branches: Branch[]; leaves: TreeLeaf[] } {
         branches.push({ x1: x, y1: y, x2: tx, y2: ty, thickness, depth });
 
         if (depth <= 3) {
-            const n = depth === 1 ? 10 : 5; // Reduced from 12/6
+            const n = depth === 1 ? 5 : 3; // Reduced further for performance optimization
             for (let i = 0; i < n; i++) {
                 leaves.push({
                     cx: tx + (seededRandom() * 70 - 35),
@@ -331,7 +331,7 @@ function generateGroundElements(info: SeasonInfo): GroundElement[] {
 
     // Expanded massive rolling hill coverage
     // Focus density on the visible area [0, 1000] with some buffer
-    const xSteps = info.baseSeason === "winter" ? 120 : 500;
+    const xSteps = info.baseSeason === "winter" ? 50 : 210;
     const yRows = info.baseSeason === "winter" ? 6 : 18;
 
     const vStart = -200;
