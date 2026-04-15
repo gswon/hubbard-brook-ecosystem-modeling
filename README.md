@@ -60,7 +60,7 @@ Once both servers have successfully started, open your web browser and navigate 
 
 You can now interact with the data and use the date selector to view the ecosystem visualizations.
 
-### 5. Deployed Website
+## TL;DR
 
-The website is deployed. Use the following URL:
+This project is currently deployed. Use the following URL:
 [**https://hubbard-brook-ecosystem-modeling.vercel.app/**](https://hubbard-brook-ecosystem-modeling.vercel.app/)
